@@ -46,6 +46,9 @@ export const joinQueue = createServerFn({ method: "POST" })
       return { status: "matched", roomId: waitingRoom[0].room_id, name: waitingRoom[0].name };
     }
 
+    // Clean up stale queue entries (> 15 mins)
+    await sql`delete from matching_queue where joined_at < now() - interval '15 minutes'`.catch(() => {});
+
     // Add to queue (upsert)
     await sql`
       insert into matching_queue (user_id, joined_at)
@@ -61,10 +64,15 @@ export const joinQueue = createServerFn({ method: "POST" })
       ? Date.now() - new Date(queueEntry[0].joined_at).getTime()
       : 0;
 
-    // Attempt to form a room: grab up to roomMax queued users who are not blocked by us
+    // Attempt to form a room: grab up to roomMax queued users who are not blocked and not already in an active room
     const candidates = await sql<{ user_id: string }>`
       select q.user_id from matching_queue q
       where q.user_id != ${userId}
+        and q.user_id not in (
+          select rm.user_id from room_members rm
+          join rooms r on r.id = rm.room_id
+          where r.status = 'active'
+        )
         and q.user_id not in (
           select blocked_id from blocks where blocker_id = ${userId}
           union all
@@ -104,7 +112,9 @@ export const joinQueue = createServerFn({ method: "POST" })
     }
 
     // Remove matched users from queue
-    await sql.query(`delete from matching_queue where user_id = any($1::text[])`, [members]);
+    for (const memberId of members) {
+      await sql`delete from matching_queue where user_id = ${memberId}`;
+    }
 
     return { status: "matched", roomId, name: roomName };
   });
