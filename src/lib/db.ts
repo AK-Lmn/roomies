@@ -6,12 +6,13 @@ export type DbSource = "neon" | "pglite";
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
 // "unset" — otherwise production would silently run on the PGLite fallback.
 const DEFAULT_DATABASE_URL =
-  "postgresql://neondb_owner:npg_BlWrJ9UuKA8P@ep-delicate-mode-az6f1c8d-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+  "postgresql://neondb_owner:npg_BlWrJ9UuKA8P@ep-delicate-mode-az6f1c8d-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full";
 
 const rawDatabaseUrl =
   typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
 const databaseUrl =
   rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : DEFAULT_DATABASE_URL;
+const normalizedDatabaseUrl = databaseUrl.replace("sslmode=require", "sslmode=verify-full");
 
 export const dbSource: DbSource = "neon";
 
@@ -90,7 +91,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({ connectionString: normalizedDatabaseUrl });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
