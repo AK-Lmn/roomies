@@ -1774,7 +1774,7 @@ function DailyTab({ roomId }: { roomId: string }) {
         <div className="rounded-2xl p-5 sm:p-6 space-y-2 border shadow-xs" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
           <div className="text-xs font-semibold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
             <Sparkles size={14} />
-            <span>{question.dayLabel} Prompt</span>
+            <span>{question.dayLabel} Question</span>
           </div>
           <h2 className="text-base sm:text-lg font-semibold leading-snug" style={{ color: "var(--color-fg)" }}>
             {question.prompt}

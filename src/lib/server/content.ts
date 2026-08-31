@@ -241,10 +241,37 @@ export const getDailyQuestion = createServerFn({ method: "GET" })
     const startedAt = new Date(roomRows[0].started_at).getTime();
     const dayIndex = Math.floor((Date.now() - startedAt) / (24 * 60 * 60 * 1000));
 
-    // Pick question deterministically for this room+day
-    const questions = await sql<{ id: number; prompt: string }>`select id, prompt from daily_questions order by id`;
+    // Seed diverse questions if table is empty
+    let questions = await sql<{ id: number; prompt: string }>`select id, prompt from daily_questions order by id`;
+    if (!questions.length) {
+      await sql`
+        insert into daily_questions (prompt) values
+        ('What is your go-to comfort food after a long day?'),
+        ('If you could travel anywhere tomorrow, where would you go?'),
+        ('What is a movie or show you can rewatch endlessly?'),
+        ('What song represents your vibe right now?'),
+        ('What is your favorite late-night snack?'),
+        ('What is one topic you could talk about for hours?'),
+        ('If you could master any skill instantly, what would it be?'),
+        ('What is your favorite childhood memory?'),
+        ('What is your ideal weekend morning routine?'),
+        ('What is something that instantly makes your day better?')
+      `.catch(() => {});
+      questions = await sql<{ id: number; prompt: string }>`select id, prompt from daily_questions order by id`;
+    }
     if (!questions.length) return null;
-    const question = questions[dayIndex % questions.length]!;
+
+    // Hash roomId + dayIndex to pick a randomized question for this room and day
+    function hashCode(str: string) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash);
+    }
+    const seed = hashCode(`${data.roomId}-${dayIndex}`);
+    const question = questions[seed % questions.length]!;
 
     const answers = await sql<{
       user_id: string; body: string; created_at: string;
