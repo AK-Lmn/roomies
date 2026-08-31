@@ -6,16 +6,12 @@ import { betterAuth } from "better-auth";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { Pool } from "pg";
-import { ensureDbReady, getPglite } from "../db";
-import { pgliteDialect } from "./pglite-dialect";
 
-// Kick PGLite bootstrap eagerly on server start if using embedded fallback
-void ensureDbReady();
+const DEFAULT_DATABASE_URL =
+  "postgresql://neondb_owner:npg_BlWrJ9UuKA8P@ep-delicate-mode-az6f1c8d-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
 
-const databaseUrl = process.env.DATABASE_URL?.trim();
-const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl })
-  : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
+const databaseUrl = (process.env.DATABASE_URL || DEFAULT_DATABASE_URL).trim();
+const database = new Pool({ connectionString: databaseUrl });
 
 export const SESSION_TOKEN_COOKIE = "roomies.session_token";
 
