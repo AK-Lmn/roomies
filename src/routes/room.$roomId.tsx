@@ -647,34 +647,34 @@ function ChatTab({
                     </div>
 
                     {/* Floating Reaction Bar (Default iOS Emojis + Plus + Reply) */}
-                    <div className={`absolute -top-4 ${msg.isMe ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"} opacity-0 group-hover/bubble:opacity-100 focus-within:opacity-100 transition-all z-10`}>
-                      <div className="flex items-center gap-1 bg-neutral-900/95 border border-neutral-700/80 rounded-full px-2 py-1 shadow-lg backdrop-blur-md">
+                    <div className={`absolute -top-5 ${msg.isMe ? "right-0" : "left-0"} opacity-0 group-hover/bubble:opacity-100 focus-within:opacity-100 transition-all z-20`}>
+                      <div className="flex items-center gap-1.5 bg-neutral-900/95 border border-neutral-700/90 rounded-full px-2.5 py-1 shadow-xl backdrop-blur-md">
                         {DEFAULT_REACTIONS.map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
                             onClick={() => void handleToggleReaction(msg.id, emoji)}
-                            className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer"
+                            className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer flex items-center justify-center"
                             title={`React ${emoji}`}
                           >
-                            <AppleEmoji emoji={emoji} size={15} />
+                            <AppleEmoji emoji={emoji} size={18} />
                           </button>
                         ))}
                         <button
                           type="button"
                           onClick={() => setPickerMessageId(msg.id)}
-                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer text-neutral-400 hover:text-amber-400"
+                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 flex items-center justify-center"
                           title="More emojis (+)"
                         >
-                          <Plus size={13} />
+                          <Plus size={15} />
                         </button>
                         <button
                           type="button"
                           onClick={() => setReplyingTo(msg)}
-                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-110 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 border-l border-neutral-700/60 pl-1.5 ml-0.5"
+                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-110 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 border-l border-neutral-700/60 pl-1.5 ml-0.5 flex items-center justify-center"
                           title="Reply to message"
                         >
-                          <CornerUpLeft size={13} />
+                          <CornerUpLeft size={15} />
                         </button>
                       </div>
                     </div>

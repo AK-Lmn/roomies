@@ -4,11 +4,11 @@ import { Plus, Search, Smile } from "lucide-react";
 
 export function emojiToHex(emoji: string): string {
   const codePoints: string[] = [];
-  for (const char of emoji) {
-    const cp = char.codePointAt(0);
-    // Skip variation selectors (0xfe0f, 0xfe0e) and joiners if standalone
-    if (cp && cp !== 0xfe0f && cp !== 0xfe0e && cp !== 0x200d) {
+  for (let i = 0; i < emoji.length; i++) {
+    const cp = emoji.codePointAt(i);
+    if (cp) {
       codePoints.push(cp.toString(16).toLowerCase());
+      if (cp > 0xffff) i++;
     }
   }
   return codePoints.join("-");
@@ -30,8 +30,8 @@ export function AppleEmoji({
   if (failed || !hex) {
     return (
       <span
-        style={{ fontSize: `${size * 0.85}px` }}
-        className={`inline-block select-none leading-none align-middle ${className}`}
+        style={{ fontSize: `${size}px`, lineHeight: 1 }}
+        className={`inline-flex items-center justify-center select-none align-middle ${className}`}
       >
         {emoji}
       </span>
