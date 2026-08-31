@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/spotify/callback")({
 
         const clientId = process.env.SPOTIFY_CLIENT_ID || "";
         const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || "";
-        const redirectUri = `${process.env.BETTER_AUTH_URL || "http://localhost:8080"}/api/spotify/callback`;
+        const origin = new URL(request.url).origin;
+        const redirectUri = `${origin}/api/spotify/callback`;
 
         try {
           const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");

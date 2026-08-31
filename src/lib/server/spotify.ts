@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { getSql, type Sql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 
@@ -78,14 +79,15 @@ export const getSpotifyStatus = createServerFn({ method: "GET" })
 /** Generate Spotify OAuth authorization URL */
 export const getSpotifyAuthUrl = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }): Promise<{ url: string | null; error?: string }> => {
+  .validator(z.object({ redirectUri: z.string().optional() }))
+  .handler(async ({ context, data }): Promise<{ url: string | null; error?: string }> => {
     const clientId = getSpotifyClientId();
     const clientSecret = getSpotifyClientSecret();
     if (!clientId || !clientSecret) {
       return { url: null, error: "SPOTIFY_NOT_CONFIGURED" };
     }
 
-    const redirectUri = `${process.env.BETTER_AUTH_URL || "http://localhost:8080"}/api/spotify/callback`;
+    const redirectUri = data.redirectUri || `${process.env.BETTER_AUTH_URL || "https://roomiesapp.vercel.app"}/api/spotify/callback`;
     const state = Buffer.from(JSON.stringify({ userId: context.userId, nonce: Math.random().toString(36) })).toString("base64url");
 
     const params = new URLSearchParams({
@@ -118,8 +120,12 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
   }
 
   // Refresh token
+  const clientId = getSpotifyClientId();
+  const clientSecret = getSpotifyClientSecret();
+  if (!clientId || !clientSecret) return null;
+
   try {
-    const basicAuth = Buffer.from(`${getSpotifyClientId()}:${getSpotifyClientSecret()}`).toString("base64");
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
     const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
@@ -134,37 +140,64 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
 
     if (!res.ok) return null;
 
-    const data = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
-    const newExpiresAt = Date.now() + data.expires_in * 1000;
+    const data = (await res.json()) as {
+      access_token: string;
+      expires_in: number;
+      refresh_token?: string;
+    };
+
+    const newAccessToken = data.access_token;
     const newRefreshToken = data.refresh_token || row.refresh_token;
+    const newExpiresAt = Date.now() + data.expires_in * 1000;
 
     await sql.query(
       `UPDATE spotify_tokens SET access_token = $1, refresh_token = $2, expires_at = $3, updated_at = now() WHERE user_id = $4`,
-      [data.access_token, newRefreshToken, newExpiresAt, userId],
+      [newAccessToken, newRefreshToken, newExpiresAt, userId],
     );
 
-    return data.access_token;
+    return newAccessToken;
   } catch {
     return null;
   }
 }
 
-/** Get what the current user is playing right now on Spotify */
+/** Save OAuth tokens from callback handler */
+export async function saveSpotifyOAuthTokens(
+  userId: string,
+  accessToken: string,
+  refreshToken: string,
+  expiresInSeconds: number,
+): Promise<void> {
+  const sql = await getSql();
+  await ensureSpotifySchema(sql);
+  const expiresAt = Date.now() + expiresInSeconds * 1000;
+
+  await sql.query(
+    `INSERT INTO spotify_tokens (user_id, access_token, refresh_token, expires_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id) DO UPDATE
+     SET access_token = EXCLUDED.access_token,
+         refresh_token = EXCLUDED.refresh_token,
+         expires_at = EXCLUDED.expires_at,
+         updated_at = now()`,
+    [userId, accessToken, refreshToken, expiresAt],
+  );
+}
+
+/** Fetch currently playing track for user */
 export const getSpotifyNowPlaying = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<SpotifyTrackInfo | null> => {
-    if (!getSpotifyClientId() || !getSpotifyClientSecret()) return null;
-
     const sql = await getSql();
-    const token = await getValidToken(sql, context.userId);
-    if (!token) return null;
+    const accessToken = await getValidToken(sql, context.userId);
+    if (!accessToken) return null;
 
     try {
       const res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      if (res.status === 204 || res.status > 400) return null;
+      if (res.status === 204 || !res.ok) return null;
 
       const data = (await res.json()) as {
         is_playing: boolean;
@@ -172,30 +205,27 @@ export const getSpotifyNowPlaying = createServerFn({ method: "GET" })
         item?: {
           name: string;
           duration_ms: number;
-          external_urls?: { spotify?: string };
-          artists?: Array<{ name: string }>;
+          artists: Array<{ name: string }>;
           album?: {
             name: string;
-            images?: Array<{ url: string }>;
+            images: Array<{ url: string }>;
+          };
+          external_urls?: {
+            spotify: string;
           };
         };
       };
 
       if (!data.item) return null;
 
-      const track = data.item;
-      const artists = (track.artists || []).map((a) => a.name).join(", ");
-      const coverUrl = track.album?.images?.[0]?.url || null;
-      const trackUrl = track.external_urls?.spotify || `https://open.spotify.com/search/${encodeURIComponent(track.name)}`;
-
       return {
-        title: track.name,
-        artist: artists || "Unknown Artist",
-        album: track.album?.name || "",
-        coverUrl,
-        url: trackUrl,
-        durationMs: track.duration_ms || 0,
-        progressMs: data.progress_ms || 0,
+        title: data.item.name,
+        artist: data.item.artists.map((a) => a.name).join(", "),
+        album: data.item.album?.name || "",
+        coverUrl: data.item.album?.images[0]?.url || null,
+        url: data.item.external_urls?.spotify || "",
+        durationMs: data.item.duration_ms,
+        progressMs: data.progress_ms,
         isPlaying: data.is_playing,
       };
     } catch {
@@ -203,31 +233,12 @@ export const getSpotifyNowPlaying = createServerFn({ method: "GET" })
     }
   });
 
-/** Disconnect Spotify */
+/** Disconnect Spotify account */
 export const disconnectSpotify = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .handler(async ({ context }): Promise<{ ok: boolean }> => {
+  .handler(async ({ context }) => {
     const sql = await getSql();
     await ensureSpotifySchema(sql);
     await sql.query(`DELETE FROM spotify_tokens WHERE user_id = $1`, [context.userId]);
     return { ok: true };
   });
-
-/** Save token from OAuth callback */
-export async function saveSpotifyOAuthTokens(
-  userId: string,
-  accessToken: string,
-  refreshToken: string,
-  expiresIn: number,
-): Promise<void> {
-  const sql = await getSql();
-  await ensureSpotifySchema(sql);
-  const expiresAt = Date.now() + expiresIn * 1000;
-  await sql.query(
-    `INSERT INTO spotify_tokens (user_id, access_token, refresh_token, expires_at, updated_at)
-     VALUES ($1, $2, $3, $4, now())
-     ON CONFLICT (user_id)
-     DO UPDATE SET access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, expires_at = EXCLUDED.expires_at, updated_at = now()`,
-    [userId, accessToken, refreshToken, expiresAt],
-  );
-}

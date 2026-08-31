@@ -1393,7 +1393,8 @@ function MusicTab({ roomId }: { roomId: string }) {
 
   async function handleConnectSpotify() {
     try {
-      const res = await getSpotifyAuthUrl();
+      const redirectUri = `${window.location.origin}/api/spotify/callback`;
+      const res = await getSpotifyAuthUrl({ data: { redirectUri } });
       if (res.url) {
         window.open(res.url, "spotify_auth", "width=600,height=700,scrollbars=yes");
       } else {
