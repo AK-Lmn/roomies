@@ -121,20 +121,26 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
   // Refresh token
   const clientId = getSpotifyClientId();
   const clientSecret = getSpotifyClientSecret();
-  if (!clientId || !clientSecret) return null;
+  if (!clientId) return null;
 
   try {
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const bodyParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: row.refresh_token,
+      client_id: clientId,
+    });
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+    if (clientSecret) {
+      bodyParams.append("client_secret", clientSecret);
+      headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+    }
+
     const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: row.refresh_token,
-      }),
+      headers,
+      body: bodyParams,
     });
 
     if (!res.ok) return null;

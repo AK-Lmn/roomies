@@ -31,18 +31,26 @@ export const Route = createFileRoute("/api/spotify/callback")({
         const redirectUri = `${origin}/api/spotify/callback`;
 
         try {
-          const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+          const bodyParams = new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: redirectUri,
+            client_id: clientId,
+          });
+
+          const headers: Record<string, string> = {
+            "Content-Type": "application/x-www-form-urlencoded",
+          };
+
+          if (clientSecret) {
+            bodyParams.append("client_secret", clientSecret);
+            headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+          }
+
           const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
             method: "POST",
-            headers: {
-              Authorization: `Basic ${basicAuth}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              grant_type: "authorization_code",
-              code,
-              redirect_uri: redirectUri,
-            }),
+            headers,
+            body: bodyParams,
           });
 
           if (!tokenRes.ok) {
