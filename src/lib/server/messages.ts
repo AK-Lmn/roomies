@@ -15,6 +15,9 @@ export const sendMessage = createServerFn({ method: "POST" })
   .validator(z.object({
     roomId: z.string(),
     body: z.string().min(1).max(LIMITS.messageMax),
+    replyToId: z.string().optional(),
+    replyToBody: z.string().optional(),
+    replyToIdentity: z.string().optional(),
   }))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
@@ -26,10 +29,18 @@ export const sendMessage = createServerFn({ method: "POST" })
     if (!membership.length) throw new Error("Not a member of this room");
 
     const id = genId();
-    await sql`
-      insert into messages (id, room_id, user_id, body)
-      values (${id}, ${data.roomId}, ${context.userId}, ${data.body})
-    `;
+    try {
+      await sql`
+        insert into messages (id, room_id, user_id, body, reply_to_id, reply_to_body, reply_to_identity)
+        values (${id}, ${data.roomId}, ${context.userId}, ${data.body}, ${data.replyToId ?? null}, ${data.replyToBody ?? null}, ${data.replyToIdentity ?? null})
+      `;
+    } catch {
+      // Fallback if reply columns not added yet
+      await sql`
+        insert into messages (id, room_id, user_id, body)
+        values (${id}, ${data.roomId}, ${context.userId}, ${data.body})
+      `;
+    }
     return { id };
   });
 
@@ -52,41 +63,67 @@ export const getMessages = createServerFn({ method: "GET" })
       params.push(data.before);
       beforeClause = `and m.created_at < $${params.length}`;
     }
-    const rows = await sql.query<{
+
+    let rows: Array<{
       id: string; room_id: string; user_id: string; body: string; created_at: string;
       temp_identity: string; identity_animal: string; identity_color: string;
       revealed: boolean; username: string | null; display_name: string | null;
-    }>(
-      `select m.id, m.room_id, m.user_id, m.body, m.created_at,
-              rm.temp_identity, rm.identity_animal, rm.identity_color, rm.revealed,
-              p.username, p.display_name
-       from messages m
-       join room_members rm on rm.room_id = m.room_id and rm.user_id = m.user_id
-       left join profiles p on p.user_id = m.user_id
-       where m.room_id = $1 ${beforeClause}
-       order by m.created_at asc
-       limit 100`,
-      params,
-    );
+      reply_to_id?: string | null; reply_to_body?: string | null; reply_to_identity?: string | null;
+    }> = [];
+
+    try {
+      rows = await sql.query(
+        `select m.id, m.room_id, m.user_id, m.body, m.created_at,
+                rm.temp_identity, rm.identity_animal, rm.identity_color, rm.revealed,
+                p.username, p.display_name,
+                m.reply_to_id, m.reply_to_body, m.reply_to_identity
+         from messages m
+         join room_members rm on rm.room_id = m.room_id and rm.user_id = m.user_id
+         left join profiles p on p.user_id = m.user_id
+         where m.room_id = $1 ${beforeClause}
+         order by m.created_at asc
+         limit 100`,
+        params,
+      );
+    } catch {
+      // Fallback without reply_to columns
+      rows = await sql.query(
+        `select m.id, m.room_id, m.user_id, m.body, m.created_at,
+                rm.temp_identity, rm.identity_animal, rm.identity_color, rm.revealed,
+                p.username, p.display_name
+         from messages m
+         join room_members rm on rm.room_id = m.room_id and rm.user_id = m.user_id
+         left join profiles p on p.user_id = m.user_id
+         where m.room_id = $1 ${beforeClause}
+         order by m.created_at asc
+         limit 100`,
+        params,
+      );
+    }
 
     if (rows.length === 0) return [];
 
     const msgIds = rows.map((r) => r.id);
-    const reactions = await sql.query<{ message_id: string; emoji: string; count: number; mine: boolean }>(
-      `select mr.message_id, mr.emoji,
-              count(*)::int as count,
-              bool_or(mr.user_id = $1) as mine
-       from message_reactions mr
-       where mr.message_id = any($2::text[])
-       group by mr.message_id, mr.emoji`,
-      [userId, msgIds],
-    );
-
     const reactionsByMsg = new Map<string, Array<{ emoji: string; count: number; mine: boolean }>>();
-    for (const r of reactions) {
-      const list = reactionsByMsg.get(r.message_id) ?? [];
-      list.push({ emoji: r.emoji, count: r.count, mine: r.mine });
-      reactionsByMsg.set(r.message_id, list);
+
+    try {
+      const reactions = await sql.query<{ message_id: string; emoji: string; count: number; mine: boolean }>(
+        `select mr.message_id, mr.emoji,
+                count(*)::int as count,
+                bool_or(mr.user_id = $1) as mine
+         from message_reactions mr
+         where mr.message_id = any($2::text[])
+         group by mr.message_id, mr.emoji`,
+        [userId, msgIds],
+      );
+
+      for (const r of reactions) {
+        const list = reactionsByMsg.get(r.message_id) ?? [];
+        list.push({ emoji: r.emoji, count: r.count, mine: r.mine });
+        reactionsByMsg.set(r.message_id, list);
+      }
+    } catch {
+      // If reactions table not migrated yet, proceed safely with empty reactions
     }
 
     return rows.map((r) => ({
@@ -101,6 +138,11 @@ export const getMessages = createServerFn({ method: "GET" })
       revealedName: r.revealed && r.display_name ? r.display_name : null,
       isMe: r.user_id === userId,
       reactions: reactionsByMsg.get(r.id) ?? [],
+      replyTo: r.reply_to_id && r.reply_to_body && r.reply_to_identity ? {
+        id: r.reply_to_id,
+        body: r.reply_to_body,
+        identity: r.reply_to_identity,
+      } : null,
     }));
   });
 

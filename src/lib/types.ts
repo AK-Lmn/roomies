@@ -78,6 +78,11 @@ export type ChatMessage = {
   revealedName: string | null;
   isMe: boolean;
   reactions: MessageReaction[];
+  replyTo?: {
+    id: string;
+    body: string;
+    identity: string;
+  } | null;
 };
 
 export type WallPost = {

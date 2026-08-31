@@ -63,6 +63,7 @@ import {
   X,
   Radio,
   Plus,
+  CornerUpLeft,
   ArrowLeft,
   LogOut,
   Image as ImageIcon,
@@ -456,6 +457,7 @@ function ChatTab({
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function loadMessages() {
@@ -531,7 +533,18 @@ function ChatTab({
     sound.playPop();
 
     try {
-      const res = await sendMessage({ data: { roomId, body: text } });
+      const targetReply = replyingTo;
+      setReplyingTo(null);
+
+      const res = await sendMessage({
+        data: {
+          roomId,
+          body: text,
+          replyToId: targetReply?.id,
+          replyToBody: targetReply?.body,
+          replyToIdentity: targetReply ? (targetReply.revealedName ?? targetReply.identity) : undefined,
+        },
+      });
       const meMember = members.find((m) => m.isMe);
       const localMsg: ChatMessage = {
         id: res.id,
@@ -545,6 +558,11 @@ function ChatTab({
         revealedName: meMember?.revealed && meMember.profile?.displayName ? meMember.profile.displayName : null,
         isMe: true,
         reactions: [],
+        replyTo: targetReply ? {
+          id: targetReply.id,
+          body: targetReply.body,
+          identity: targetReply.revealedName ?? targetReply.identity,
+        } : null,
       };
       setMessages((prev) => [...prev, localMsg]);
       p2p.broadcastChat({ ...localMsg, isMe: false });
@@ -604,17 +622,31 @@ function ChatTab({
                   </div>
                   <div className="relative group/bubble flex items-center gap-1.5">
                     <div
-                      className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-xs"
+                      className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-xs space-y-1"
                       style={{
                         background: msg.isMe ? "var(--color-primary)" : "var(--color-surface2)",
                         color: msg.isMe ? "var(--color-primary-fg)" : "var(--color-fg)",
                         border: msg.isMe ? "none" : "1px solid var(--color-border)",
                       }}
                     >
-                      {msg.body}
+                      {msg.replyTo && (
+                        <div
+                          className="text-[11px] rounded-lg px-2.5 py-1 border-l-2 border-amber-400 font-medium opacity-90 space-y-0.5"
+                          style={{
+                            background: msg.isMe ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.06)",
+                          }}
+                        >
+                          <div className="flex items-center gap-1 opacity-75 font-semibold text-[10px]">
+                            <CornerUpLeft size={10} />
+                            <span>{msg.replyTo.identity}</span>
+                          </div>
+                          <div className="truncate max-w-[220px]">{msg.replyTo.body}</div>
+                        </div>
+                      )}
+                      <div>{msg.body}</div>
                     </div>
 
-                    {/* Floating Reaction Bar (Default iOS Emojis + Plus) */}
+                    {/* Floating Reaction Bar (Default iOS Emojis + Plus + Reply) */}
                     <div className={`absolute -top-4 ${msg.isMe ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"} opacity-0 group-hover/bubble:opacity-100 focus-within:opacity-100 transition-all z-10`}>
                       <div className="flex items-center gap-1 bg-neutral-900/95 border border-neutral-700/80 rounded-full px-2 py-1 shadow-lg backdrop-blur-md">
                         {DEFAULT_REACTIONS.map((emoji) => (
@@ -636,18 +668,36 @@ function ChatTab({
                         >
                           <Plus size={13} />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(msg)}
+                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-110 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 border-l border-neutral-700/60 pl-1.5 ml-0.5"
+                          title="Reply to message"
+                        >
+                          <CornerUpLeft size={13} />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Mobile / Tap Quick Plus Button */}
-                    <button
-                      type="button"
-                      onClick={() => setPickerMessageId(msg.id)}
-                      className="p-1 rounded-full opacity-40 hover:opacity-100 text-neutral-400 hover:text-amber-400 transition-all cursor-pointer shrink-0"
-                      title="React to message"
-                    >
-                      <Plus size={13} />
-                    </button>
+                    {/* Mobile / Quick Reply & Plus Buttons */}
+                    <div className="flex items-center gap-0.5 opacity-40 hover:opacity-100 transition-opacity shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo(msg)}
+                        className="p-1 rounded-full text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+                        title="Reply"
+                      >
+                        <CornerUpLeft size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPickerMessageId(msg.id)}
+                        className="p-1 rounded-full text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+                        title="React"
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Active Reactions Pills */}
@@ -687,6 +737,24 @@ function ChatTab({
           }
         }}
       />
+
+      {replyingTo && (
+        <div className="flex-none px-4 py-2 border-t flex items-center justify-between gap-2 text-xs" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}>
+          <div className="flex items-center gap-2 truncate min-w-0">
+            <CornerUpLeft size={13} className="text-amber-400 shrink-0" />
+            <span className="font-semibold text-amber-400 shrink-0">Replying to {replyingTo.revealedName ?? replyingTo.identity}:</span>
+            <span className="truncate opacity-75" style={{ color: "var(--color-fg)" }}>"{replyingTo.body}"</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingTo(null)}
+            className="p-1 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 cursor-pointer shrink-0"
+            title="Cancel reply"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {p2p.typingUsers.length > 0 && (
         <div className="w-full max-w-3xl mx-auto px-4 py-1 text-[11px] italic flex items-center gap-2" style={{ color: "var(--color-muted)" }}>
