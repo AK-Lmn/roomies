@@ -2,6 +2,18 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Plus, Search, Smile } from "lucide-react";
 
+export function emojiToHex(emoji: string): string {
+  const codePoints: string[] = [];
+  for (let i = 0; i < emoji.length; i++) {
+    const cp = emoji.codePointAt(i);
+    if (cp) {
+      codePoints.push(cp.toString(16).toLowerCase());
+      if (cp > 0xffff) i++;
+    }
+  }
+  return codePoints.join("-");
+}
+
 export function AppleEmoji({
   emoji,
   size = 18,
@@ -11,17 +23,34 @@ export function AppleEmoji({
   size?: number;
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
+  const hex = emojiToHex(emoji);
+  const cdnUrl = `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/${hex}.png`;
+
+  if (failed || !hex) {
+    return (
+      <span
+        style={{
+          fontSize: `${size}px`,
+          lineHeight: 1,
+          fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif',
+        }}
+        className={`inline-flex items-center justify-center select-none align-middle ${className}`}
+      >
+        {emoji}
+      </span>
+    );
+  }
+
   return (
-    <span
-      style={{
-        fontSize: `${size}px`,
-        lineHeight: 1,
-        fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif',
-      }}
-      className={`inline-flex items-center justify-center select-none align-middle ${className}`}
-    >
-      {emoji}
-    </span>
+    <img
+      src={cdnUrl}
+      alt={emoji}
+      onError={() => setFailed(true)}
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className={`inline-block object-contain select-none align-middle ${className}`}
+      loading="lazy"
+    />
   );
 }
 
@@ -58,7 +87,7 @@ export function EmojiPickerModal({
       isOpen={isOpen}
       onClose={onClose}
       title="React with Emoji"
-      subtitle="Choose an emoji reaction"
+      subtitle="Choose an iOS emoji reaction"
       icon={<Smile size={18} className="text-amber-400" />}
       iconBg="rgba(245, 158, 11, 0.15)"
     >
