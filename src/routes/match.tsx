@@ -15,12 +15,16 @@ function MatchPage() {
   const [waitMs, setWaitMs] = useState(0);
   const [error, setError] = useState("");
   const [activeUsers, setActiveUsers] = useState<number>(1);
+  const [queueCount, setQueueCount] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef<number>(Date.now());
 
   useEffect(() => {
     const updateCount = () => {
-      getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
+      getActiveOnlineCount().then((res) => {
+        setActiveUsers(res.activeCount);
+        setQueueCount(res.queueCount);
+      }).catch(() => {});
     };
     updateCount();
     const interval = setInterval(updateCount, 8_000);
@@ -167,14 +171,16 @@ function MatchPage() {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{activeUsers === 1 ? "1 user in matching pool" : `${activeUsers} users in matching pool`}</span>
+                <span>{queueCount <= 1 ? "1 user searching in queue" : `${queueCount} users searching in queue`} ({activeUsers} online overall)</span>
               </div>
 
               <h2 className="text-base font-semibold" style={{ color: "var(--color-fg)" }}>
                 Finding your room…
               </h2>
-              <p className="text-xs" style={{ color: "var(--color-muted)" }}>
-                {waitSecs < 4
+              <p className="text-xs leading-relaxed max-w-xs mx-auto" style={{ color: "var(--color-muted)" }}>
+                {queueCount < 2
+                  ? "Waiting for at least 1 more roommate to join the queue (2–8 required per room)…"
+                  : waitSecs < 4
                   ? "Connecting to the matching pool…"
                   : waitSecs < 10
                   ? "Looking for compatible roommates…"

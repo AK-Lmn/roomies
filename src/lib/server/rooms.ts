@@ -269,7 +269,7 @@ export const pingPresence = createServerFn({ method: "POST" })
 // ─── live active presence counter ──────────────────────────────────────────
 
 export const getActiveOnlineCount = createServerFn({ method: "GET" })
-  .handler(async (): Promise<{ activeCount: number }> => {
+  .handler(async (): Promise<{ activeCount: number; queueCount: number }> => {
     try {
       const sql = await getSql();
       const rows = await sql<{ count: number }>`
@@ -282,10 +282,14 @@ export const getActiveOnlineCount = createServerFn({ method: "GET" })
           select user_id from profiles where updated_at > now() - interval '15 minutes'
         ) active_users
       `;
+      const queueRows = await sql<{ count: number }>`
+        select count(*)::int as count from matching_queue
+      `;
       const rawCount = rows[0]?.count ?? 0;
-      return { activeCount: Math.max(1, rawCount) };
+      const queueCount = queueRows[0]?.count ?? 0;
+      return { activeCount: Math.max(1, rawCount), queueCount };
     } catch {
-      return { activeCount: 1 };
+      return { activeCount: 1, queueCount: 0 };
     }
   });
 
