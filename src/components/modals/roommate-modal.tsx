@@ -113,51 +113,69 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
                   Connect & Links
                 </span>
                 <div className="flex gap-2 flex-wrap">
-                  {member.profile.social.website && (
-                    <a
-                      href={member.profile.social.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-amber-300"
-                      style={{
-                        background: "rgba(217, 119, 6, 0.12)",
-                        borderColor: "rgba(217, 119, 6, 0.35)",
-                      }}
-                    >
-                      <Globe size={12} />
-                      <span>Website</span>
-                    </a>
-                  )}
-                  {member.profile.social.instagram && (
-                    <a
-                      href={`https://instagram.com/${member.profile.social.instagram}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-rose-300"
-                      style={{
-                        background: "rgba(244, 63, 94, 0.12)",
-                        borderColor: "rgba(244, 63, 94, 0.35)",
-                      }}
-                    >
-                      <Instagram size={12} />
-                      <span>@{member.profile.social.instagram}</span>
-                    </a>
-                  )}
-                  {member.profile.social.x && (
-                    <a
-                      href={`https://x.com/${member.profile.social.x}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-sky-300"
-                      style={{
-                        background: "rgba(14, 165, 233, 0.12)",
-                        borderColor: "rgba(14, 165, 233, 0.35)",
-                      }}
-                    >
-                      <Twitter size={12} />
-                      <span>@{member.profile.social.x}</span>
-                    </a>
-                  )}
+                  {(member.profile.social.facebook || member.profile.social.website) && (() => {
+                    const rawFb = member.profile.social.facebook || member.profile.social.website || "";
+                    const fbHandle = rawFb.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
+                    const fbHref = rawFb.startsWith("http") ? rawFb : `https://facebook.com/${fbHandle}`;
+                    if (!fbHandle) return null;
+                    return (
+                      <a
+                        href={fbHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-blue-300"
+                        style={{
+                          background: "rgba(59, 130, 246, 0.12)",
+                          borderColor: "rgba(59, 130, 246, 0.35)",
+                        }}
+                      >
+                        <span className="font-extrabold text-[10px]">fb</span>
+                        <span>facebook.com/{fbHandle}</span>
+                      </a>
+                    );
+                  })()}
+                  {member.profile.social.instagram && (() => {
+                    const rawIg = member.profile.social.instagram;
+                    const igHandle = rawIg.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
+                    const igHref = `https://instagram.com/${igHandle}`;
+                    if (!igHandle) return null;
+                    return (
+                      <a
+                        href={igHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-rose-300"
+                        style={{
+                          background: "rgba(244, 63, 94, 0.12)",
+                          borderColor: "rgba(244, 63, 94, 0.35)",
+                        }}
+                      >
+                        <Instagram size={12} />
+                        <span>@{igHandle}</span>
+                      </a>
+                    );
+                  })()}
+                  {member.profile.social.x && (() => {
+                    const rawX = member.profile.social.x;
+                    const xHandle = rawX.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
+                    const xHref = `https://x.com/${xHandle}`;
+                    if (!xHandle) return null;
+                    return (
+                      <a
+                        href={xHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all hover:scale-105 border text-sky-300"
+                        style={{
+                          background: "rgba(14, 165, 233, 0.12)",
+                          borderColor: "rgba(14, 165, 233, 0.35)",
+                        }}
+                      >
+                        <Twitter size={12} />
+                        <span>@{xHandle}</span>
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
             )}

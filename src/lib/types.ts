@@ -1,9 +1,10 @@
 export type RoomStatus = "waiting" | "active" | "archived";
 
 export type SocialLinks = {
-  website: string;
+  facebook: string;
   instagram: string;
   x: string;
+  website?: string;
 };
 
 export type Profile = {

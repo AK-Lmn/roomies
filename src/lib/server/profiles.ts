@@ -39,7 +39,7 @@ export const getMyProfile = createServerFn({ method: "GET" })
       displayName: r.display_name,
       bio: r.bio,
       avatarUrl: r.avatar_url,
-      social: { website: r.website_url, instagram: r.instagram_url, x: r.x_url },
+      social: { facebook: r.website_url, instagram: r.instagram_url, x: r.x_url, website: r.website_url },
       showBio: r.show_bio,
       showSocial: r.show_social,
       showJoined: r.show_joined,
@@ -78,7 +78,7 @@ export const getProfileByUsername = createServerFn({ method: "GET" })
       displayName: r.display_name,
       bio: r.bio,
       avatarUrl: r.avatar_url,
-      social: { website: r.website_url, instagram: r.instagram_url, x: r.x_url },
+      social: { facebook: r.website_url, instagram: r.instagram_url, x: r.x_url, website: r.website_url },
       showBio: r.show_bio,
       showSocial: r.show_social,
       showJoined: r.show_joined,
@@ -93,7 +93,8 @@ const profileSchema = z.object({
   displayName: z.string().min(LIMITS.displayNameMin).max(LIMITS.displayNameMax),
   bio: z.string().max(LIMITS.bioMax).default(""),
   avatarUrl: z.string().url().nullable().default(null),
-  websiteUrl: z.string().max(LIMITS.socialUrlMax).default(""),
+  facebookUrl: z.string().max(LIMITS.socialUrlMax).optional().default(""),
+  websiteUrl: z.string().max(LIMITS.socialUrlMax).optional().default(""),
   instagramUrl: z.string().max(LIMITS.socialUrlMax).default(""),
   xUrl: z.string().max(LIMITS.socialUrlMax).default(""),
   showBio: z.boolean().default(true),
@@ -107,6 +108,8 @@ export const upsertProfile = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     const username = normalizeUsername(data.username);
+    const fbUrl = data.facebookUrl || data.websiteUrl || "";
+
     // Check uniqueness excluding self
     const conflict = await sql<{ user_id: string }>`
       select user_id from profiles where lower(username) = ${username} and user_id != ${context.userId}
@@ -118,7 +121,7 @@ export const upsertProfile = createServerFn({ method: "POST" })
                             website_url, instagram_url, x_url,
                             show_bio, show_social, show_joined, updated_at)
       values (${context.userId}, ${username}, ${data.displayName}, ${data.bio}, ${data.avatarUrl},
-              ${data.websiteUrl}, ${data.instagramUrl}, ${data.xUrl},
+              ${fbUrl}, ${data.instagramUrl}, ${data.xUrl},
               ${data.showBio}, ${data.showSocial}, ${data.showJoined}, now())
       on conflict (user_id) do update set
         username      = excluded.username,

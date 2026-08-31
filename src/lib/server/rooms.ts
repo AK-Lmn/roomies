@@ -202,7 +202,7 @@ export const getRoom = createServerFn({ method: "GET" })
               bio: m.bio,
               avatarUrl: m.avatar_url,
               social: m.website_url !== null
-                ? { website: m.website_url, instagram: m.instagram_url ?? "", x: m.x_url ?? "" }
+                ? { facebook: m.website_url, website: m.website_url, instagram: m.instagram_url ?? "", x: m.x_url ?? "" }
                 : null,
               createdAt: m.profile_created_at,
             }

@@ -21,7 +21,7 @@ function ProfilePage() {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [xUrl, setXUrl] = useState("");
   const [showBio, setShowBio] = useState(true);
@@ -53,7 +53,7 @@ function ProfilePage() {
       setDisplayName(p.displayName);
       setBio(p.bio);
       setSelectedAvatar(getAvatarChoiceByUrl(p.avatarUrl));
-      setWebsiteUrl(p.social.website);
+      setFacebookUrl(p.social.facebook || p.social.website || "");
       setInstagramUrl(p.social.instagram);
       setXUrl(p.social.x);
       setShowBio(p.showBio);
@@ -116,7 +116,8 @@ function ProfilePage() {
           displayName: displayName.trim(),
           bio: bio.trim(),
           avatarUrl: selectedAvatar.avatarUrl,
-          websiteUrl: websiteUrl.trim(),
+          facebookUrl: facebookUrl.trim(),
+          websiteUrl: facebookUrl.trim(),
           instagramUrl: instagramUrl.trim(),
           xUrl: xUrl.trim(),
           showBio,
@@ -298,16 +299,16 @@ function ProfilePage() {
             </div>
             
             <div className="space-y-2">
-              {/* Website */}
+              {/* Facebook */}
               <div className="relative">
-                <div className="absolute left-3 top-2.5 text-neutral-400 pointer-events-none">
-                  <Globe size={15} />
+                <div className="absolute left-3 top-2.5 text-blue-400 pointer-events-none font-extrabold text-xs">
+                  fb
                 </div>
                 <input
                   type="text"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="Website URL"
+                  value={facebookUrl}
+                  onChange={(e) => setFacebookUrl(e.target.value)}
+                  placeholder="Facebook username or profile link"
                   maxLength={LIMITS.socialUrlMax}
                   className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 border"
                   style={{
@@ -440,24 +441,42 @@ function ProfilePage() {
               <p className="text-xs italic text-neutral-500">Bio hidden by privacy settings</p>
             )}
 
-            {showSocial && (websiteUrl.trim() || instagramUrl.trim() || xUrl.trim()) ? (
+            {showSocial && (facebookUrl.trim() || instagramUrl.trim() || xUrl.trim()) ? (
               <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Social Links</span>
                 <div className="flex gap-2 flex-wrap">
-                  {websiteUrl.trim() && (
-                    <a href={websiteUrl.trim()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-amber-300 bg-amber-500/10 border-amber-500/30">
-                      <Globe size={11} /> {websiteUrl.replace(/^https?:\/\//, '')}
+                  {facebookUrl.trim() && (
+                    <a
+                      href={facebookUrl.trim().startsWith('http') ? facebookUrl.trim() : `https://facebook.com/${facebookUrl.trim().replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-blue-300 bg-blue-500/10 border-blue-500/30 font-medium"
+                    >
+                      <span className="font-extrabold text-[10px]">fb</span>
+                      <span>facebook.com/{facebookUrl.trim().replace(/^https?:\/\/(www\.)?facebook\.com\//i, '').replace(/^@/, '')}</span>
                     </a>
                   )}
                   {instagramUrl.trim() && (
-                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-pink-300 bg-pink-500/10 border-pink-500/30">
-                      <Instagram size={11} /> @{instagramUrl.replace(/^@/, '')}
-                    </span>
+                    <a
+                      href={`https://instagram.com/${instagramUrl.trim().replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-pink-300 bg-pink-500/10 border-pink-500/30 font-medium"
+                    >
+                      <Instagram size={11} />
+                      <span>@{instagramUrl.trim().replace(/^@/, '')}</span>
+                    </a>
                   )}
                   {xUrl.trim() && (
-                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-sky-300 bg-sky-500/10 border-sky-500/30">
-                      <Twitter size={11} /> @{xUrl.replace(/^@/, '')}
-                    </span>
+                    <a
+                      href={`https://x.com/${xUrl.trim().replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-sky-300 bg-sky-500/10 border-sky-500/30 font-medium"
+                    >
+                      <Twitter size={11} />
+                      <span>@{xUrl.trim().replace(/^@/, '')}</span>
+                    </a>
                   )}
                 </div>
               </div>
