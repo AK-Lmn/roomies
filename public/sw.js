@@ -1,5 +1,5 @@
-const CACHE_NAME = "roomies-v1";
-const STATIC_ASSETS = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.svg", "/icon-512.svg"];
+const CACHE_NAME = "roomies-v2";
+const STATIC_ASSETS = ["/", "/manifest.webmanifest", "/favicon.png", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
