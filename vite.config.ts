@@ -52,7 +52,6 @@ export default defineConfig(() => ({
   },
   resolve: { tsconfigPaths: true },
   plugins: [
-    pgliteBootstrapPlugin(),
     tailwindcss(),
     tanstackStart(),
     nitro(),

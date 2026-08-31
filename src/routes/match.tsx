@@ -181,7 +181,7 @@ function MatchPage() {
       </main>
 
       <footer className="w-full max-w-sm mx-auto text-center">
-        <p className="text-[11px] opacity-40">Roomies · Ephemeral Cozy Spaces</p>
+        <p className="text-[11px] opacity-40">Roomies</p>
       </footer>
     </div>
   );

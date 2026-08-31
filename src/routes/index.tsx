@@ -59,40 +59,42 @@ function HomePage() {
 
   return (
     <div className="min-h-dvh flex flex-col justify-between" style={{ background: "var(--color-bg)" }}>
-      <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-xs">
-            <Compass size={16} />
+      <header className="px-4 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
+        <div className="w-full max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-xs">
+              <Compass size={16} />
+            </div>
+            <span className="font-bold tracking-tight text-sm" style={{ color: "var(--color-fg)" }}>
+              Roomies
+            </span>
           </div>
-          <span className="font-bold tracking-tight text-sm" style={{ color: "var(--color-fg)" }}>
-            Roomies
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <SignedIn>
-            <a
-              href="/profile"
-              className="text-xs font-medium inline-flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity"
-              style={{ color: "var(--color-fg)" }}
-            >
-              <User size={13} />
-              <span>Profile</span>
-            </a>
-            <UserButton />
-          </SignedIn>
-          <SignedOut>
-            <a
-              href="/login"
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-opacity hover:opacity-90 shadow-xs"
-              style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)", borderColor: "var(--color-border)" }}
-            >
-              Sign In
-            </a>
-          </SignedOut>
+          <div className="flex items-center gap-3">
+            <SignedIn>
+              <a
+                href="/profile"
+                className="text-xs font-medium inline-flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity"
+                style={{ color: "var(--color-fg)" }}
+              >
+                <User size={13} />
+                <span>Profile</span>
+              </a>
+              <UserButton />
+            </SignedIn>
+            <SignedOut>
+              <a
+                href="/login"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-opacity hover:opacity-90 shadow-xs"
+                style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)", borderColor: "var(--color-border)" }}
+              >
+                Sign In
+              </a>
+            </SignedOut>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-10 space-y-8 my-auto">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-10 md:py-14 space-y-8 my-auto">
         <SignedOut>
           <div className="text-center space-y-6 py-8">
             <div className="mx-auto h-20 w-20 rounded-3xl flex items-center justify-center border shadow-2xl" style={{ background: "rgba(194, 144, 90, 0.12)", borderColor: "var(--color-border)", color: "var(--color-primary)" }}>
@@ -100,12 +102,12 @@ function HomePage() {
             </div>
 
             <div className="space-y-3">
-              <h1 className="text-4xl font-extrabold tracking-tight" style={{ color: "var(--color-fg)" }}>
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight" style={{ color: "var(--color-fg)" }}>
                 A room.<br />
                 <span className="text-amber-400">Anonymous strangers.</span><br />
                 7 days.
               </h1>
-              <p className="text-sm max-w-sm mx-auto leading-relaxed" style={{ color: "var(--color-muted)" }}>
+              <p className="text-sm sm:text-base max-w-md mx-auto leading-relaxed" style={{ color: "var(--color-muted)" }}>
                 Get matched into an ephemeral room with 1–8 people. Chat, share music, stick fridge notes. Choose when to reveal who you are.
               </p>
             </div>
@@ -113,7 +115,7 @@ function HomePage() {
             <div>
               <a
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-xl px-7 py-3 text-sm font-semibold transition-all hover:scale-105 shadow-xl"
+                className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold transition-all hover:scale-105 shadow-xl"
                 style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
               >
                 <Sparkles size={16} />
@@ -140,7 +142,7 @@ function HomePage() {
                 </a>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {rooms.map((room) => (
                   <a
                     key={room.id}
@@ -200,7 +202,7 @@ function HomePage() {
       </main>
 
       <footer className="px-4 py-3 border-t text-center" style={{ borderColor: "var(--color-border)" }}>
-        <p className="text-[11px] opacity-40">Roomies · Ephemeral Cozy Spaces</p>
+        <p className="text-[11px] opacity-40">Roomies</p>
       </footer>
     </div>
   );
