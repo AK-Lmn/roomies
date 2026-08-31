@@ -322,8 +322,8 @@ function RoomPage() {
         ))}
       </nav>
 
-      <div className="flex-1 overflow-hidden">
-        {tab === "chat" && (
+      <div className="flex-1 overflow-hidden relative">
+        <div className={tab === "chat" ? "h-full" : "hidden"}>
           <ChatTab
             roomId={roomId}
             members={room.members}
@@ -331,23 +331,27 @@ function RoomPage() {
             myIdentity={me?.tempIdentity ?? "Roomie"}
             onIncomingChatRef={onIncomingChatRef}
           />
-        )}
-        {tab === "wall" && (
+        </div>
+        <div className={tab === "wall" ? "h-full" : "hidden"}>
           <WallTab
             roomId={roomId}
             p2p={p2p}
             onIncomingReactionRef={onIncomingReactionRef}
           />
-        )}
-        {tab === "fridge" && (
+        </div>
+        <div className={tab === "fridge" ? "h-full" : "hidden"}>
           <FridgeTab
             roomId={roomId}
             p2p={p2p}
             onIncomingNoteRef={onIncomingNoteRef}
           />
-        )}
-        {tab === "music" && <MusicTab roomId={roomId} />}
-        {tab === "daily" && <DailyTab roomId={roomId} />}
+        </div>
+        <div className={tab === "music" ? "h-full" : "hidden"}>
+          <MusicTab roomId={roomId} />
+        </div>
+        <div className={tab === "daily" ? "h-full" : "hidden"}>
+          <DailyTab roomId={roomId} />
+        </div>
       </div>
 
       <footer className="flex-none px-4 py-2 border-t flex items-center gap-2 overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
