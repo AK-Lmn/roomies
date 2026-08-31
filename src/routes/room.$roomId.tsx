@@ -282,39 +282,39 @@ function RoomPage() {
 
           {me && (
             <div
-              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-full cursor-pointer hover:bg-neutral-800 transition-all border"
+              className="flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-2.5 py-1 rounded-full cursor-pointer hover:bg-neutral-800 transition-all border shrink-0"
               style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
               onClick={() => setSelectedMember(me)}
             >
               <AnimalAvatar
                 animal={me.identityAnimal}
                 color={me.identityColor}
-                size={20}
+                size={18}
                 revealed={me.revealed}
                 displayName={me.profile?.displayName}
               />
-              <span className="text-[11px] sm:text-xs font-medium max-w-[65px] sm:max-w-none truncate" style={{ color: "var(--color-fg)" }}>
+              <span className="text-[11px] sm:text-xs font-medium max-w-[55px] sm:max-w-[110px] truncate" style={{ color: "var(--color-fg)" }}>
                 {me.revealed && me.profile?.displayName ? me.profile.displayName : me.tempIdentity}
               </span>
-              {me.revealed && <BadgeCheck size={13} className="text-amber-400 shrink-0" />}
+              {me.revealed && <BadgeCheck size={12} className="text-amber-400 shrink-0" />}
             </div>
           )}
         </div>
       </header>
 
-      <nav className="flex-none flex border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
+      <nav className="flex-none flex border-b overflow-x-auto scrollbar-none" style={{ borderColor: "var(--color-border)" }}>
         {TABS.map(({ id: t, label, Icon }) => (
           <button
             key={t}
             onClick={() => handleSelectTab(t)}
-            className="flex-1 min-w-0 py-2.5 px-3 inline-flex items-center justify-center gap-1.5 text-xs font-medium transition-colors relative"
+            className="flex-1 min-w-0 py-2 sm:py-2.5 px-1 sm:px-3 inline-flex items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-medium transition-colors relative whitespace-nowrap"
             style={{
               color: tab === t ? "var(--color-primary)" : "var(--color-muted)",
               borderBottom: tab === t ? "2px solid var(--color-primary)" : "2px solid transparent",
             }}
           >
-            <Icon size={13} />
-            <span>{label}</span>
+            <Icon size={13} className="shrink-0" />
+            <span className="whitespace-nowrap truncate">{label}</span>
             {unreadTabs[t] && tab !== t && (
               <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" title="New activity" />
             )}
