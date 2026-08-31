@@ -70,37 +70,30 @@ export const joinQueue = createServerFn({ method: "POST" })
     const profile = await sql<{ user_id: string }>`select user_id from profiles where user_id = ${userId}`;
     if (!profile.length) return { status: "needs_profile" };
 
-    // Check if already in an active room
-    const activeRoom = await sql<{ room_id: string; name: string }>`
+    // 1. Check if another user's matchmaking call just matched us into a new room within the last 45 seconds
+    const recentlyMatchedRoom = await sql<{ room_id: string; name: string }>`
       select rm.room_id, r.name from room_members rm
       join rooms r on r.id = rm.room_id
-      where rm.user_id = ${userId} and r.status = 'active'
+      where rm.user_id = ${userId}
+        and rm.joined_at >= now() - interval '45 seconds'
+        and r.status = 'active'
+      order by rm.joined_at desc
       limit 1
     `;
-    if (activeRoom.length) {
-      return { status: "matched", roomId: activeRoom[0].room_id, name: activeRoom[0].name };
+    if (recentlyMatchedRoom.length) {
+      await sql`delete from matching_queue where user_id = ${userId}`.catch(() => {});
+      return { status: "matched", roomId: recentlyMatchedRoom[0].room_id, name: recentlyMatchedRoom[0].name };
     }
 
-    // Check if already in a waiting room that's filling up
-    const waitingRoom = await sql<{ room_id: string; name: string; member_count: number }>`
-      select rm.room_id, r.name, count(*) over (partition by rm.room_id)::int as member_count
-      from room_members rm
-      join rooms r on r.id = rm.room_id
-      where rm.user_id = ${userId} and r.status = 'waiting'
-      limit 1
-    `;
-    if (waitingRoom.length) {
-      return { status: "matched", roomId: waitingRoom[0].room_id, name: waitingRoom[0].name };
-    }
-
-    // Clean up stale queue entries (> 15 mins)
+    // 2. Clean up stale queue entries (> 15 mins) and closed rooms
     await sql`delete from matching_queue where joined_at < now() - interval '15 minutes'`.catch(() => {});
+    await sql`update rooms set status = 'closed' where ends_at is not null and ends_at < now() and status = 'active'`.catch(() => {});
 
-    // Add to queue (upsert)
+    // 3. Add to queue (upsert)
     await sql`
       insert into matching_queue (user_id, joined_at)
       values (${userId}, now())
-      on conflict (user_id) do nothing
+      on conflict (user_id) do update set joined_at = now()
     `;
 
     // How long have we been waiting?
@@ -111,15 +104,10 @@ export const joinQueue = createServerFn({ method: "POST" })
       ? Date.now() - new Date(queueEntry[0].joined_at).getTime()
       : 0;
 
-    // Attempt to form a room: grab up to roomMax queued users who are not blocked and not already in an active room
+    // 4. Attempt to form a room: grab up to roomMax queued users who are not blocked
     const candidates = await sql<{ user_id: string }>`
       select q.user_id from matching_queue q
       where q.user_id != ${userId}
-        and q.user_id not in (
-          select rm.user_id from room_members rm
-          join rooms r on r.id = rm.room_id
-          where r.status = 'active'
-        )
         and q.user_id not in (
           select blocked_id from blocks where blocker_id = ${userId}
           union all
@@ -135,7 +123,7 @@ export const joinQueue = createServerFn({ method: "POST" })
       return { status: "matching", waitedMs };
     }
 
-    // Form a room (cap at roomMax)
+    // 5. Form a new room (cap at roomMax)
     const members = pool.slice(0, LIMITS.roomMax);
     const roomId = genId();
     const roomName = pickRoomName();
@@ -153,8 +141,8 @@ export const joinQueue = createServerFn({ method: "POST" })
       const { tempIdentity, animal, color } = pickIdentity(taken);
       taken.add(tempIdentity);
       await sql`
-        insert into room_members (room_id, user_id, temp_identity, identity_animal, identity_color)
-        values (${roomId}, ${memberId}, ${tempIdentity}, ${animal}, ${color})
+        insert into room_members (room_id, user_id, temp_identity, identity_animal, identity_color, joined_at)
+        values (${roomId}, ${memberId}, ${tempIdentity}, ${animal}, ${color}, now())
       `;
     }
 
