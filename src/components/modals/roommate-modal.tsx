@@ -2,7 +2,7 @@ import React from "react";
 import { Modal } from "@/components/ui/modal";
 import { AnimalAvatar } from "@/components/animal-avatar";
 import type { RoomView } from "@/lib/types";
-import { BadgeCheck, Globe, Instagram, Twitter, KeyRound, Shield, Link2, Sparkles, User } from "lucide-react";
+import { BadgeCheck, Globe, Facebook, Instagram, Twitter, KeyRound, Shield, Link2, Sparkles, User } from "lucide-react";
 
 interface RoommateModalProps {
   member: RoomView["members"][0] | null;
@@ -115,9 +115,8 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
                 <div className="flex gap-2 flex-wrap">
                   {(member.profile.social.facebook || member.profile.social.website) && (() => {
                     const rawFb = member.profile.social.facebook || member.profile.social.website || "";
-                    const fbHandle = rawFb.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
-                    const fbHref = rawFb.startsWith("http") ? rawFb : `https://facebook.com/${fbHandle}`;
-                    if (!fbHandle) return null;
+                    const fbHref = rawFb.startsWith("http") ? rawFb : `https://facebook.com/${rawFb.replace(/^@/, "")}`;
+                    if (!rawFb) return null;
                     return (
                       <a
                         href={fbHref}
@@ -129,16 +128,16 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
                           borderColor: "rgba(59, 130, 246, 0.35)",
                         }}
                       >
-                        <span className="font-extrabold text-[10px]">fb</span>
-                        <span>facebook.com/{fbHandle}</span>
+                        <Facebook size={12} />
+                        <span>Facebook</span>
                       </a>
                     );
                   })()}
                   {member.profile.social.instagram && (() => {
                     const rawIg = member.profile.social.instagram;
                     const igHandle = rawIg.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
-                    const igHref = `https://instagram.com/${igHandle}`;
-                    if (!igHandle) return null;
+                    const igHref = rawIg.startsWith("http") ? rawIg : `https://instagram.com/${igHandle}`;
+                    if (!rawIg) return null;
                     return (
                       <a
                         href={igHref}
@@ -151,15 +150,15 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
                         }}
                       >
                         <Instagram size={12} />
-                        <span>@{igHandle}</span>
+                        <span>{igHandle ? `@${igHandle}` : "Instagram"}</span>
                       </a>
                     );
                   })()}
                   {member.profile.social.x && (() => {
                     const rawX = member.profile.social.x;
                     const xHandle = rawX.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
-                    const xHref = `https://x.com/${xHandle}`;
-                    if (!xHandle) return null;
+                    const xHref = rawX.startsWith("http") ? rawX : `https://x.com/${xHandle}`;
+                    if (!rawX) return null;
                     return (
                       <a
                         href={xHref}
@@ -172,7 +171,7 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
                         }}
                       >
                         <Twitter size={12} />
-                        <span>@{xHandle}</span>
+                        <span>{xHandle ? `@${xHandle}` : "X / Twitter"}</span>
                       </a>
                     );
                   })()}

@@ -9,7 +9,7 @@ import { generateRandomUsername } from "@/lib/username-generator";
 import type { Profile } from "@/lib/types";
 import { UserButton } from "@/lib/auth/gates";
 import { Modal } from "@/components/ui/modal";
-import { ArrowLeft, Check, X, Shield, Globe, Instagram, Twitter, User, Shuffle, Loader2, Eye, Sparkles, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Check, X, Shield, Globe, Facebook, Instagram, Twitter, User, Shuffle, Loader2, Eye, Sparkles, BadgeCheck } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -301,14 +301,14 @@ function ProfilePage() {
             <div className="space-y-2">
               {/* Facebook */}
               <div className="relative">
-                <div className="absolute left-3 top-2.5 text-blue-400 pointer-events-none font-extrabold text-xs">
-                  fb
+                <div className="absolute left-3 top-2.5 text-neutral-400 pointer-events-none">
+                  <Facebook size={15} />
                 </div>
                 <input
                   type="text"
                   value={facebookUrl}
                   onChange={(e) => setFacebookUrl(e.target.value)}
-                  placeholder="Facebook username or profile link"
+                  placeholder="Facebook profile link or username"
                   maxLength={LIMITS.socialUrlMax}
                   className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 border"
                   style={{
@@ -447,37 +447,45 @@ function ProfilePage() {
                 <div className="flex gap-2 flex-wrap">
                   {facebookUrl.trim() && (
                     <a
-                      href={facebookUrl.trim().startsWith('http') ? facebookUrl.trim() : `https://facebook.com/${facebookUrl.trim().replace(/^@/, '')}`}
+                      href={facebookUrl.trim().startsWith("http") ? facebookUrl.trim() : `https://facebook.com/${facebookUrl.trim().replace(/^@/, "")}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-blue-300 bg-blue-500/10 border-blue-500/30 font-medium"
+                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-blue-300 bg-blue-500/10 border-blue-500/30 font-medium hover:bg-blue-500/20 transition-colors"
                     >
-                      <span className="font-extrabold text-[10px]">fb</span>
-                      <span>facebook.com/{facebookUrl.trim().replace(/^https?:\/\/(www\.)?facebook\.com\//i, '').replace(/^@/, '')}</span>
+                      <Facebook size={12} />
+                      <span>Facebook</span>
                     </a>
                   )}
-                  {instagramUrl.trim() && (
-                    <a
-                      href={`https://instagram.com/${instagramUrl.trim().replace(/^@/, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-pink-300 bg-pink-500/10 border-pink-500/30 font-medium"
-                    >
-                      <Instagram size={11} />
-                      <span>@{instagramUrl.trim().replace(/^@/, '')}</span>
-                    </a>
-                  )}
-                  {xUrl.trim() && (
-                    <a
-                      href={`https://x.com/${xUrl.trim().replace(/^@/, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-sky-300 bg-sky-500/10 border-sky-500/30 font-medium"
-                    >
-                      <Twitter size={11} />
-                      <span>@{xUrl.trim().replace(/^@/, '')}</span>
-                    </a>
-                  )}
+                  {instagramUrl.trim() && (() => {
+                    const igHandle = instagramUrl.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
+                    const igHref = instagramUrl.trim().startsWith("http") ? instagramUrl.trim() : `https://instagram.com/${igHandle}`;
+                    return (
+                      <a
+                        href={igHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-pink-300 bg-pink-500/10 border-pink-500/30 font-medium hover:bg-pink-500/20 transition-colors"
+                      >
+                        <Instagram size={12} />
+                        <span>{igHandle ? `@${igHandle}` : "Instagram"}</span>
+                      </a>
+                    );
+                  })()}
+                  {xUrl.trim() && (() => {
+                    const xHandle = xUrl.trim().replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/\/$/, "").replace(/^@/, "");
+                    const xHref = xUrl.trim().startsWith("http") ? xUrl.trim() : `https://x.com/${xHandle}`;
+                    return (
+                      <a
+                        href={xHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border text-sky-300 bg-sky-500/10 border-sky-500/30 font-medium hover:bg-sky-500/20 transition-colors"
+                      >
+                        <Twitter size={12} />
+                        <span>{xHandle ? `@${xHandle}` : "X / Twitter"}</span>
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
             ) : showSocial ? (
