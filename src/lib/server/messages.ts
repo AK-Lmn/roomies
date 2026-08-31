@@ -10,6 +10,37 @@ function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+let tableEnsured = false;
+async function ensureReactionsTable(sql: any) {
+  if (tableEnsured) return;
+  try {
+    await sql`
+      create table if not exists message_reactions (
+        message_id text not null references messages(id) on delete cascade,
+        user_id text not null,
+        emoji text not null,
+        created_at timestamptz default now() not null,
+        primary key (message_id, user_id, emoji)
+      );
+    `;
+    await sql`
+      create index if not exists idx_message_reactions_message_id on message_reactions (message_id);
+    `;
+    await sql`
+      alter table messages add column if not exists reply_to_id text;
+    `;
+    await sql`
+      alter table messages add column if not exists reply_to_body text;
+    `;
+    await sql`
+      alter table messages add column if not exists reply_to_identity text;
+    `;
+    tableEnsured = true;
+  } catch {
+    // Ignore if table/columns already exist
+  }
+}
+
 export const sendMessage = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({
@@ -21,6 +52,8 @@ export const sendMessage = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    await ensureReactionsTable(sql);
+
     // Must be a member of the room
     const membership = await sql<{ room_id: string }>`
       select room_id from room_members
@@ -49,7 +82,9 @@ export const getMessages = createServerFn({ method: "GET" })
   .validator(z.object({ roomId: z.string(), before: z.string().optional() }))
   .handler(async ({ context, data }): Promise<ChatMessage[]> => {
     const sql = await getSql();
+    await ensureReactionsTable(sql);
     const userId = context.userId;
+
     // Must be member
     const membership = await sql<{ room_id: string }>`
       select room_id from room_members
@@ -151,6 +186,7 @@ export const toggleMessageReaction = createServerFn({ method: "POST" })
   }))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    await ensureReactionsTable(sql);
     const userId = context.userId;
 
     const msgs = await sql<{ room_id: string }>`

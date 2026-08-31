@@ -648,7 +648,7 @@ function ChatTab({
             const authorAnimal = member?.identityAnimal ?? msg.animal ?? "Fox";
 
             return (
-              <div key={msg.id} className={`group relative flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
+              <div key={msg.id} className={`group/chat relative flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
                 <AnimalAvatar
                   animal={authorAnimal}
                   color={authorColor}
@@ -689,14 +689,14 @@ function ChatTab({
                     </div>
 
                     {/* Floating Reaction Bar (Default iOS Emojis + Plus + Reply) */}
-                    <div className={`absolute -top-5 ${msg.isMe ? "right-0" : "left-0"} opacity-0 group-hover/bubble:opacity-100 focus-within:opacity-100 transition-all z-20`}>
-                      <div className="flex items-center gap-1.5 bg-neutral-900/95 border border-neutral-700/90 rounded-full px-2.5 py-1 shadow-xl backdrop-blur-md">
+                    <div className={`absolute -top-7 ${msg.isMe ? "right-0" : "left-0"} opacity-0 group-hover/chat:opacity-100 focus-within:opacity-100 transition-all z-30 pt-2`}>
+                      <div className="flex items-center gap-1 bg-neutral-900/95 border border-neutral-700/90 rounded-full px-2 py-1 shadow-2xl backdrop-blur-md">
                         {DEFAULT_REACTIONS.map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
                             onClick={() => void handleToggleReaction(msg.id, emoji)}
-                            className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer flex items-center justify-center"
+                            className="w-7 h-7 shrink-0 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer flex items-center justify-center"
                             title={`React ${emoji}`}
                           >
                             <AppleEmoji emoji={emoji} size={18} />
@@ -705,7 +705,7 @@ function ChatTab({
                         <button
                           type="button"
                           onClick={() => setPickerMessageId(msg.id)}
-                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 flex items-center justify-center"
+                          className="w-7 h-7 shrink-0 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 flex items-center justify-center"
                           title="More emojis (+)"
                         >
                           <Plus size={15} />
@@ -713,7 +713,7 @@ function ChatTab({
                         <button
                           type="button"
                           onClick={() => setReplyingTo(msg)}
-                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-110 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 border-l border-neutral-700/60 pl-1.5 ml-0.5 flex items-center justify-center"
+                          className="w-7 h-7 shrink-0 rounded-full hover:bg-neutral-800 hover:scale-110 transition-all cursor-pointer text-neutral-400 hover:text-amber-400 border-l border-neutral-700/60 flex items-center justify-center"
                           title="Reply to message"
                         >
                           <CornerUpLeft size={15} />
