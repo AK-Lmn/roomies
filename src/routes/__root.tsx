@@ -4,7 +4,35 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import appCss from "../styles.css?url";
 
+import { useEffect } from "react";
+
 const APP_NAME = "Roomies";
+
+function RootComponent() {
+  useEffect(() => {
+    const handlePreloadError = () => {
+      window.location.reload();
+    };
+    window.addEventListener("vite:preloadError", handlePreloadError);
+    return () => window.removeEventListener("vite:preloadError", handlePreloadError);
+  }, []);
+
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <PreviewHostBridge />
+        <AuthProvider>
+          <Outlet />
+          <PWAInstallPrompt />
+        </AuthProvider>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -33,19 +61,5 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
-  component: () => (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <Outlet />
-          <PWAInstallPrompt />
-        </AuthProvider>
-        <Scripts />
-      </body>
-    </html>
-  ),
+  component: RootComponent,
 });
