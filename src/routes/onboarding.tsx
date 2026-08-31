@@ -138,7 +138,7 @@ function OnboardingPage() {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Alex Rivers"
+              placeholder="Zio"
               maxLength={LIMITS.displayNameMax}
               required
               className="w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-1 border transition-all"

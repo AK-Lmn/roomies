@@ -128,7 +128,7 @@ function LoginPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Alex"
+                placeholder="Zio"
                 required
                 className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
                 style={{
@@ -148,7 +148,7 @@ function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="alex@example.com"
+              placeholder="zio@example.com"
               required
               className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
               style={{
