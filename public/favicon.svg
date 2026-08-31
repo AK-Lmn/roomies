@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#0e0d0b"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" stroke="#c2905a" stroke-width="8" stroke-opacity="0.3"/>
+  <circle cx="256" cy="256" r="160" stroke="#c2905a" stroke-width="16" stroke-opacity="0.2"/>
+  <circle cx="256" cy="256" r="80" fill="#c2905a" fill-opacity="0.15" stroke="#c2905a" stroke-width="12"/>
+  <!-- Compass Needle / Cozy Roomies Emblem -->
+  <polygon points="256 112 288 240 256 224 224 240 256 112" fill="#c2905a"/>
+  <polygon points="256 400 288 272 256 288 224 272 256 400" fill="#c2905a" fill-opacity="0.4"/>
+  <circle cx="256" cy="256" r="20" fill="#c2905a"/>
+  <circle cx="256" cy="256" r="8" fill="#0e0d0b"/>
+</svg>
