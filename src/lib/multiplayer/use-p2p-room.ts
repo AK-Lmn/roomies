@@ -4,6 +4,7 @@ import type { ChatMessage } from "@/lib/types";
 
 export type P2PMessagePayload =
   | { type: "chat"; message: ChatMessage }
+  | { type: "chat_reaction"; messageId: string; emoji: string; added: boolean; userId: string }
   | { type: "typing"; isTyping: boolean; identity: string }
   | { type: "reaction"; postId: string; kind: string }
   | { type: "note_added"; noteId: string };
@@ -13,6 +14,7 @@ export interface UseP2PRoomOptions {
   userId: string;
   name: string;
   onChatMessage?: (message: ChatMessage) => void;
+  onChatMessageReaction?: (messageId: string, emoji: string, added: boolean, userId: string) => void;
   onReaction?: (postId: string, kind: string) => void;
   onNoteAdded?: (noteId: string) => void;
 }
@@ -22,6 +24,7 @@ export function useP2PRoom({
   userId,
   name,
   onChatMessage,
+  onChatMessageReaction,
   onReaction,
   onNoteAdded,
 }: UseP2PRoomOptions) {
@@ -33,10 +36,10 @@ export function useP2PRoom({
 
   const roomRef = useRef<P2PRoom | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const callbacksRef = useRef({ onChatMessage, onReaction, onNoteAdded });
+  const callbacksRef = useRef({ onChatMessage, onChatMessageReaction, onReaction, onNoteAdded });
 
   useEffect(() => {
-    callbacksRef.current = { onChatMessage, onReaction, onNoteAdded };
+    callbacksRef.current = { onChatMessage, onChatMessageReaction, onReaction, onNoteAdded };
   });
 
   // Clean stale typing indicators
@@ -71,11 +74,13 @@ export function useP2PRoom({
       onConnected: () => {
         setConnected(true);
       },
-      onMessage: (from, data, channel) => {
+      onMessage: (from, data) => {
         try {
           const payload = data as P2PMessagePayload;
           if (payload.type === "chat" && callbacksRef.current.onChatMessage) {
             callbacksRef.current.onChatMessage(payload.message);
+          } else if (payload.type === "chat_reaction" && callbacksRef.current.onChatMessageReaction) {
+            callbacksRef.current.onChatMessageReaction(payload.messageId, payload.emoji, payload.added, payload.userId);
           } else if (payload.type === "typing") {
             setTypingUsers((prev) => {
               const next = new Map(prev);
@@ -105,11 +110,15 @@ export function useP2PRoom({
       roomRef.current = null;
       setConnected(false);
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, name]);
 
   const broadcastChat = useCallback((message: ChatMessage) => {
     roomRef.current?.send({ type: "chat", message });
   }, []);
+
+  const broadcastChatReaction = useCallback((messageId: string, emoji: string, added: boolean) => {
+    roomRef.current?.send({ type: "chat_reaction", messageId, emoji, added, userId });
+  }, [userId]);
 
   const sendTyping = useCallback(
     (isTyping: boolean, identity: string) => {
@@ -143,6 +152,7 @@ export function useP2PRoom({
     latency,
     typingUsers: Array.from(typingUsers.values()).map((v) => v.identity),
     broadcastChat,
+    broadcastChatReaction,
     sendTyping,
     broadcastReaction,
     broadcastNoteAdded,

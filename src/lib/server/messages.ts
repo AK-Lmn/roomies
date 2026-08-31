@@ -107,24 +107,21 @@ export const getMessages = createServerFn({ method: "GET" })
     const reactionsByMsg = new Map<string, Array<{ emoji: string; count: number; mine: boolean }>>();
 
     try {
-      const reactions = await sql.query<{ message_id: string; emoji: string; count: number; mine: boolean }>(
-        `select mr.message_id, mr.emoji,
-                count(*)::int as count,
-                bool_or(mr.user_id = $1) as mine
-         from message_reactions mr
-         where mr.message_id = any($2::text[])
-         group by mr.message_id, mr.emoji`,
-        [userId, msgIds],
-      );
+      const reactions = await sql<{ message_id: string; emoji: string; count: number; mine: boolean }>`
+        select message_id, emoji,
+               count(*)::int as count,
+               bool_or(user_id = ${userId}) as mine
+        from message_reactions
+        where message_id = any(${msgIds})
+        group by message_id, emoji
+      `;
 
       for (const r of reactions) {
         const list = reactionsByMsg.get(r.message_id) ?? [];
         list.push({ emoji: r.emoji, count: r.count, mine: r.mine });
         reactionsByMsg.set(r.message_id, list);
       }
-    } catch {
-      // If reactions table not migrated yet, proceed safely with empty reactions
-    }
+    } catch {}
 
     return rows.map((r) => ({
       id: r.id,

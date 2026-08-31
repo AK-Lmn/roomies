@@ -115,6 +115,7 @@ function RoomPage() {
 
   // Incoming P2P events dispatcher refs
   const onIncomingChatRef = useRef<((msg: ChatMessage) => void) | null>(null);
+  const onIncomingChatReactionRef = useRef<((messageId: string, emoji: string, added: boolean, userId: string) => void) | null>(null);
   const onIncomingReactionRef = useRef<((postId: string, kind: string) => void) | null>(null);
   const onIncomingNoteRef = useRef<(() => void) | null>(null);
 
@@ -136,6 +137,9 @@ function RoomPage() {
       }
       sendBackgroundNotification(`Roomies · ${msg.identity}`, msg.body);
       onIncomingChatRef.current?.(msg);
+    },
+    onChatMessageReaction: (messageId, emoji, added, authorUserId) => {
+      onIncomingChatReactionRef.current?.(messageId, emoji, added, authorUserId);
     },
     onReaction: (postId, kind) => {
       if (tab !== "wall") {
@@ -333,6 +337,7 @@ function RoomPage() {
             p2p={p2p}
             myIdentity={me?.tempIdentity ?? "Roomie"}
             onIncomingChatRef={onIncomingChatRef}
+            onIncomingChatReactionRef={onIncomingChatReactionRef}
           />
         </div>
         <div className={tab === "wall" ? "h-full" : "hidden"}>
@@ -446,12 +451,14 @@ function ChatTab({
   p2p,
   myIdentity,
   onIncomingChatRef,
+  onIncomingChatReactionRef,
 }: {
   roomId: string;
   members: RoomView["members"];
   p2p: ReturnType<typeof useP2PRoom>;
   myIdentity: string;
   onIncomingChatRef: React.MutableRefObject<((msg: ChatMessage) => void) | null>;
+  onIncomingChatReactionRef: React.MutableRefObject<((messageId: string, emoji: string, added: boolean, userId: string) => void) | null>;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [body, setBody] = useState("");
@@ -484,6 +491,40 @@ function ChatTab({
   }, [onIncomingChatRef]);
 
   useEffect(() => {
+    onIncomingChatReactionRef.current = (messageId, emoji, added, authorUserId) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const existing = msg.reactions?.find((r) => r.emoji === emoji);
+          let newReactions = [...(msg.reactions ?? [])];
+          const isMine = authorUserId === "me";
+          if (added) {
+            if (existing) {
+              newReactions = newReactions.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count + 1, mine: r.mine || isMine } : r
+              );
+            } else {
+              newReactions.push({ emoji, count: 1, mine: isMine });
+            }
+          } else {
+            if (existing && existing.count > 1) {
+              newReactions = newReactions.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count - 1, mine: isMine ? false : r.mine } : r
+              );
+            } else {
+              newReactions = newReactions.filter((r) => r.emoji !== emoji);
+            }
+          }
+          return { ...msg, reactions: newReactions };
+        })
+      );
+    };
+    return () => {
+      onIncomingChatReactionRef.current = null;
+    };
+  }, [onIncomingChatReactionRef]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -495,6 +536,7 @@ function ChatTab({
     sound.playPop();
     try {
       const res = await toggleMessageReaction({ data: { messageId, emoji } });
+      p2p.broadcastChatReaction(messageId, emoji, res.added);
       setMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId) return msg;
