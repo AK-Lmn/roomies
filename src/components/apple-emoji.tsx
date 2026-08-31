@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Plus, Search, Smile } from "lucide-react";
 
@@ -12,6 +12,30 @@ export function emojiToHex(emoji: string): string {
     }
   }
   return codePoints.join("-");
+}
+
+export const DEFAULT_REACTIONS = ["❤️", "😂", "😢", "😮", "😡"];
+
+export const POPULAR_EMOJIS = [
+  // Defaults
+  "❤️", "😂", "😢", "😮", "😡",
+  // Joy & Love
+  "🥰", "😍", "🤩", "😎", "🥳", "😭", "💀", "🤣", "🥺", "😊", "🤗", "😇", "😴",
+  // Hands & Gestures
+  "👍", "👎", "👏", "🙌", "🤝", "🙏", "💯", "🔥", "✨", "🫶", "✌️", "🫡", "💪",
+  // Fun & Vibe
+  "🎉", "☕", "🧋", "🍕", "🎸", "🎵", "🚀", "💌", "🎯", "🎈", "🎁", "⭐", "🌈",
+];
+
+// Preload default reaction images into browser cache immediately on module load
+if (typeof window !== "undefined") {
+  DEFAULT_REACTIONS.forEach((emoji) => {
+    const hex = emojiToHex(emoji);
+    if (hex) {
+      const img = new Image();
+      img.src = `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/${hex}.png`;
+    }
+  });
 }
 
 export function AppleEmoji({
@@ -49,23 +73,9 @@ export function AppleEmoji({
       onError={() => setFailed(true)}
       style={{ width: `${size}px`, height: `${size}px` }}
       className={`inline-block object-contain select-none align-middle ${className}`}
-      loading="lazy"
     />
   );
 }
-
-export const DEFAULT_REACTIONS = ["❤️", "😂", "😢", "😮", "😡"];
-
-export const POPULAR_EMOJIS = [
-  // Defaults
-  "❤️", "😂", "😢", "😮", "😡",
-  // Joy & Love
-  "🥰", "😍", "🤩", "😎", "🥳", "😭", "💀", "🤣", "🥺", "😊", "🤗", "😇", "😴",
-  // Hands & Gestures
-  "👍", "👎", "👏", "🙌", "🤝", "🙏", "💯", "🔥", "✨", "🫶", "✌️", "🫡", "💪",
-  // Fun & Vibe
-  "🎉", "☕", "🧋", "🍕", "🎸", "🎵", "🚀", "💌", "🎯", "🎈", "🎁", "⭐", "🌈",
-];
 
 export function EmojiPickerModal({
   isOpen,
