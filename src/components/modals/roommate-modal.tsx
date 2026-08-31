@@ -2,7 +2,7 @@ import React from "react";
 import { Modal } from "@/components/ui/modal";
 import { AnimalAvatar } from "@/components/animal-avatar";
 import type { RoomView } from "@/lib/types";
-import { BadgeCheck, Globe, Instagram, Twitter, KeyRound, Shield, Link2, Sparkles } from "lucide-react";
+import { BadgeCheck, Globe, Instagram, Twitter, KeyRound, Shield, Link2, Sparkles, User } from "lucide-react";
 
 interface RoommateModalProps {
   member: RoomView["members"][0] | null;
@@ -35,22 +35,37 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
       iconBg={member.identityColor ? `${member.identityColor}25` : "var(--color-surface2)"}
       footer={
         <div className="w-full flex items-center justify-between gap-2">
-          {isMe && !member.revealed && onRequestReveal ? (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onRequestReveal();
-              }}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all hover:opacity-90 shadow-xs"
-              style={{
-                background: "var(--color-primary)",
-                color: "var(--color-primary-fg)",
-              }}
-            >
-              <KeyRound size={13} />
-              <span>Reveal Profile</span>
-            </button>
+          {isMe ? (
+            <div className="flex items-center gap-2">
+              {!member.revealed && onRequestReveal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onRequestReveal();
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-all hover:opacity-90 shadow-xs"
+                  style={{
+                    background: "var(--color-primary)",
+                    color: "var(--color-primary-fg)",
+                  }}
+                >
+                  <KeyRound size={13} />
+                  <span>Reveal Profile</span>
+                </button>
+              )}
+              <a
+                href="/profile"
+                className="px-3 py-2 rounded-xl text-xs font-medium inline-flex items-center gap-1.5 transition-all border hover:bg-neutral-800"
+                style={{
+                  borderColor: "var(--color-border)",
+                  color: "var(--color-fg)",
+                }}
+              >
+                <User size={13} />
+                <span>Edit Profile</span>
+              </a>
+            </div>
           ) : (
             <div />
           )}

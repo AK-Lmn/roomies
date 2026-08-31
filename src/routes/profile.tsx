@@ -8,7 +8,8 @@ import { ANIMAL_AVATAR_CHOICES, getAvatarChoiceByUrl, type AnimalAvatarChoice } 
 import { generateRandomUsername } from "@/lib/username-generator";
 import type { Profile } from "@/lib/types";
 import { UserButton } from "@/lib/auth/gates";
-import { ArrowLeft, Check, X, Shield, Globe, Instagram, Twitter, User, Shuffle, Loader2 } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
+import { ArrowLeft, Check, X, Shield, Globe, Instagram, Twitter, User, Shuffle, Loader2, Eye, Sparkles, BadgeCheck } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -31,6 +32,7 @@ function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"available" | "taken" | "invalid" | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const userId = user?.id;
 
@@ -143,14 +145,30 @@ function ProfilePage() {
       </header>
 
       <main className="max-w-sm mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 shadow-md shrink-0 flex items-center justify-center p-1" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface2)" }}>
-            <img src={selectedAvatar.avatarUrl} alt="" className="w-full h-full object-contain rounded-xl" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 shadow-md shrink-0 flex items-center justify-center p-1" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface2)" }}>
+              <img src={selectedAvatar.avatarUrl} alt="" className="w-full h-full object-contain rounded-xl" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold" style={{ color: "var(--color-fg)" }}>Your profile</h1>
+              <p className="text-xs opacity-70" style={{ color: "var(--color-muted)" }}>Customize avatar & identity</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold" style={{ color: "var(--color-fg)" }}>Your profile</h1>
-            <p className="text-xs opacity-70" style={{ color: "var(--color-muted)" }}>Customize your avatar and roommate identity</p>
-          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPreviewModal(true)}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border transition-all hover:scale-105 shadow-xs shrink-0 cursor-pointer"
+            style={{
+              background: "var(--color-surface2)",
+              color: "var(--color-primary)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <Eye size={14} />
+            <span>Preview</span>
+          </button>
         </div>
 
         <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
@@ -376,6 +394,87 @@ function ProfilePage() {
           </button>
         </form>
       </main>
+
+      <Modal
+        isOpen={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        title={displayName.trim() || "Your Display Name"}
+        subtitle={`@${username.trim() || "username"}`}
+        icon={
+          <div className="w-10 h-10 rounded-xl p-1 overflow-hidden border shadow-xs flex items-center justify-center" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface2)" }}>
+            <img src={selectedAvatar.avatarUrl} alt="" className="w-full h-full object-contain rounded-lg" />
+          </div>
+        }
+        iconBg={`${selectedAvatar.color}25`}
+        footer={
+          <div className="w-full flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-medium border hover:opacity-80 transition-opacity cursor-pointer"
+              style={{ background: "var(--color-surface2)", color: "var(--color-fg)", borderColor: "var(--color-border)" }}
+            >
+              Close Preview
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-3.5 rounded-xl border space-y-3" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                <Sparkles size={12} /> Revealed Profile Preview
+              </span>
+              <span className="text-emerald-400 font-medium flex items-center gap-1">
+                <BadgeCheck size={13} /> Verified
+              </span>
+            </div>
+
+            {showBio && bio.trim() ? (
+              <p className="text-xs leading-relaxed" style={{ color: "var(--color-fg)" }}>
+                {bio.trim()}
+              </p>
+            ) : showBio ? (
+              <p className="text-xs italic text-neutral-500">No bio provided</p>
+            ) : (
+              <p className="text-xs italic text-neutral-500">Bio hidden by privacy settings</p>
+            )}
+
+            {showSocial && (websiteUrl.trim() || instagramUrl.trim() || xUrl.trim()) ? (
+              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Social Links</span>
+                <div className="flex gap-2 flex-wrap">
+                  {websiteUrl.trim() && (
+                    <a href={websiteUrl.trim()} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-amber-300 bg-amber-500/10 border-amber-500/30">
+                      <Globe size={11} /> {websiteUrl.replace(/^https?:\/\//, '')}
+                    </a>
+                  )}
+                  {instagramUrl.trim() && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-pink-300 bg-pink-500/10 border-pink-500/30">
+                      <Instagram size={11} /> @{instagramUrl.replace(/^@/, '')}
+                    </span>
+                  )}
+                  {xUrl.trim() && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border text-sky-300 bg-sky-500/10 border-sky-500/30">
+                      <Twitter size={11} /> @{xUrl.replace(/^@/, '')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : showSocial ? (
+              <p className="text-[11px] italic text-neutral-500">No social links provided</p>
+            ) : (
+              <p className="text-[11px] italic text-neutral-500">Social links hidden by privacy settings</p>
+            )}
+
+            {showJoined && (
+              <p className="text-[10px] text-neutral-500 border-t pt-2" style={{ borderColor: "var(--color-border)" }}>
+                Member since today
+              </p>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
