@@ -179,9 +179,10 @@ export const getSongs = createServerFn({ method: "GET" })
     const rows = await sql<{
       id: string; room_id: string; user_id: string;
       title: string; artist: string; url: string; cover_url: string | null;
+      preview_url?: string | null;
       created_at: string; temp_identity: string;
     }>`
-      select s.id, s.room_id, s.user_id, s.title, s.artist, s.url, s.cover_url, s.created_at,
+      select s.id, s.room_id, s.user_id, s.title, s.artist, s.url, s.cover_url, s.preview_url, s.created_at,
              rm.temp_identity
       from songs s
       join room_members rm on rm.room_id = s.room_id and rm.user_id = s.user_id
@@ -191,6 +192,7 @@ export const getSongs = createServerFn({ method: "GET" })
     return rows.map((r) => ({
       id: r.id, roomId: r.room_id, userId: r.user_id,
       title: r.title, artist: r.artist, url: r.url, coverUrl: r.cover_url,
+      previewUrl: r.preview_url,
       createdAt: r.created_at, identity: r.temp_identity, isMe: r.user_id === context.userId,
     }));
   });
@@ -203,15 +205,24 @@ export const addSong = createServerFn({ method: "POST" })
     artist: z.string().min(1).max(LIMITS.songArtistMax),
     url: z.string().url().max(LIMITS.songUrlMax),
     coverUrl: z.string().url().nullable().default(null),
+    previewUrl: z.string().url().nullable().optional(),
   }))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     await assertMember(sql, data.roomId, context.userId);
+    await sql`alter table songs add column if not exists preview_url text;`.catch(() => {});
     const id = genId();
-    await sql`
-      insert into songs (id, room_id, user_id, title, artist, url, cover_url)
-      values (${id}, ${data.roomId}, ${context.userId}, ${data.title}, ${data.artist}, ${data.url}, ${data.coverUrl})
-    `;
+    try {
+      await sql`
+        insert into songs (id, room_id, user_id, title, artist, url, cover_url, preview_url)
+        values (${id}, ${data.roomId}, ${context.userId}, ${data.title}, ${data.artist}, ${data.url}, ${data.coverUrl}, ${data.previewUrl ?? null})
+      `;
+    } catch {
+      await sql`
+        insert into songs (id, room_id, user_id, title, artist, url, cover_url)
+        values (${id}, ${data.roomId}, ${context.userId}, ${data.title}, ${data.artist}, ${data.url}, ${data.coverUrl})
+      `;
+    }
     return { id };
   });
 

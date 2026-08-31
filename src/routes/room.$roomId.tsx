@@ -67,6 +67,8 @@ import {
   ArrowLeft,
   LogOut,
   Image as ImageIcon,
+  Play,
+  Pause,
 } from "lucide-react";
 
 export const Route = createFileRoute("/room/$roomId")({ component: RoomPage });
@@ -1198,6 +1200,47 @@ function FridgeTab({
 function MusicTab({ roomId }: { roomId: string }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [activeTab, setActiveTab] = useState<"search" | "paste">("search");
+  const [playingPreviewUrl, setPlayingPreviewUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  function togglePreview(url: string | null) {
+    if (!url) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+    }
+
+    if (playingPreviewUrl === url) {
+      setPlayingPreviewUrl(null);
+      audioRef.current = null;
+      return;
+    }
+
+    sound.playPop();
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setPlayingPreviewUrl(url);
+
+    audio.play().catch(() => {
+      setPlayingPreviewUrl(null);
+      audioRef.current = null;
+    });
+
+    audio.onended = () => {
+      setPlayingPreviewUrl(null);
+      audioRef.current = null;
+    };
+  }
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TrackSearchResult[]>([]);
@@ -1292,6 +1335,7 @@ function MusicTab({ roomId }: { roomId: string }) {
           artist: track.artist,
           url: track.url,
           coverUrl: track.coverUrl,
+          previewUrl: track.previewUrl,
         },
       });
       await loadSongs();
@@ -1499,13 +1543,33 @@ function MusicTab({ roomId }: { roomId: string }) {
                       className="flex items-center justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/70 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        {track.coverUrl ? (
-                          <img src={track.coverUrl} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0" />
-                        ) : (
-                          <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-neutral-800 text-xs shrink-0">
-                            <Disc3 size={16} className="text-neutral-400" />
-                          </div>
-                        )}
+                        <div
+                          onClick={(e) => {
+                            if (track.previewUrl) {
+                              e.stopPropagation();
+                              togglePreview(track.previewUrl);
+                            }
+                          }}
+                          className={`relative group/cover h-10 w-10 rounded-lg overflow-hidden shrink-0 ${track.previewUrl ? "cursor-pointer" : ""}`}
+                          title={track.previewUrl ? "Listen to 30s preview" : undefined}
+                        >
+                          {track.coverUrl ? (
+                            <img src={track.coverUrl} alt="" className="h-10 w-10 object-cover" />
+                          ) : (
+                            <div className="h-10 w-10 flex items-center justify-center bg-neutral-800 text-xs">
+                              <Disc3 size={16} className="text-neutral-400" />
+                            </div>
+                          )}
+                          {track.previewUrl && (
+                            <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-all ${playingPreviewUrl === track.previewUrl ? "opacity-100 bg-black/70" : "opacity-0 group-hover/cover:opacity-100"}`}>
+                              {playingPreviewUrl === track.previewUrl ? (
+                                <Pause size={14} className="text-amber-400 animate-pulse fill-amber-400" />
+                              ) : (
+                                <Play size={14} className="text-white fill-white ml-0.5" />
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <div className="min-w-0">
                           <div className="text-xs sm:text-sm font-semibold truncate text-white">{track.title}</div>
                           <div className="text-[11px] truncate opacity-70" style={{ color: "var(--color-muted)" }}>
@@ -1589,13 +1653,33 @@ function MusicTab({ roomId }: { roomId: string }) {
               style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
             >
               <div className="flex items-center gap-3">
-                {song.coverUrl ? (
-                  <img src={song.coverUrl} alt="" className="h-12 w-12 rounded-xl object-cover shrink-0 shadow-xs" />
-                ) : (
-                  <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-neutral-800 text-neutral-400 shrink-0">
-                    <Disc3 size={20} />
-                  </div>
-                )}
+                <div
+                  onClick={(e) => {
+                    if (song.previewUrl) {
+                      e.stopPropagation();
+                      togglePreview(song.previewUrl);
+                    }
+                  }}
+                  className={`relative group/cover h-12 w-12 rounded-xl overflow-hidden shrink-0 shadow-xs ${song.previewUrl ? "cursor-pointer" : ""}`}
+                  title={song.previewUrl ? "Listen to 30s preview" : undefined}
+                >
+                  {song.coverUrl ? (
+                    <img src={song.coverUrl} alt="" className="h-12 w-12 object-cover" />
+                  ) : (
+                    <div className="h-12 w-12 flex items-center justify-center bg-neutral-800 text-neutral-400">
+                      <Disc3 size={20} />
+                    </div>
+                  )}
+                  {song.previewUrl && (
+                    <div className={`absolute inset-0 bg-black/50 flex items-center justify-center transition-all ${playingPreviewUrl === song.previewUrl ? "opacity-100 bg-black/70" : "opacity-0 group-hover/cover:opacity-100"}`}>
+                      {playingPreviewUrl === song.previewUrl ? (
+                        <Pause size={16} className="text-amber-400 animate-pulse fill-amber-400" />
+                      ) : (
+                        <Play size={16} className="text-white fill-white ml-0.5" />
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold truncate" style={{ color: "var(--color-fg)" }}>
                     {song.title}

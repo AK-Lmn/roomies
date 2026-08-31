@@ -120,6 +120,7 @@ export type Song = {
   artist: string;
   url: string;
   coverUrl: string | null;
+  previewUrl?: string | null;
   createdAt: string;
   identity: string;
   isMe: boolean;
