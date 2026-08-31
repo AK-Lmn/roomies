@@ -167,7 +167,6 @@ function RoomPage() {
 
   return (
     <div className="flex flex-col h-dvh" style={{ background: "var(--color-bg)" }}>
-      {/* Header */}
       <header className="flex-none flex items-center justify-between gap-3 px-4 py-2.5 border-b" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <a href="/" className="opacity-60 hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-neutral-800">
@@ -178,7 +177,6 @@ function RoomPage() {
               <span className="text-sm font-semibold truncate" style={{ color: "var(--color-fg)" }}>
                 {room.name}
               </span>
-              {/* Connection Status Pill */}
               <span
                 className="hidden sm:inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors"
                 style={{
@@ -204,9 +202,7 @@ function RoomPage() {
           </div>
         </div>
 
-        {/* Right action controls */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Sound Mute Toggle */}
           <button
             type="button"
             onClick={handleToggleSound}
@@ -217,7 +213,6 @@ function RoomPage() {
             {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
 
-          {/* Reveal button */}
           {me && !me.revealed && (
             <button
               type="button"
@@ -230,7 +225,6 @@ function RoomPage() {
             </button>
           )}
 
-          {/* My identity chip */}
           {me && (
             <div
               className="flex items-center gap-2 px-2.5 py-1 rounded-full cursor-pointer hover:bg-neutral-800 transition-all border"
@@ -253,7 +247,6 @@ function RoomPage() {
         </div>
       </header>
 
-      {/* Tabs */}
       <nav className="flex-none flex border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
         {TABS.map(({ id: t, label, Icon }) => (
           <button
@@ -271,7 +264,6 @@ function RoomPage() {
         ))}
       </nav>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-hidden">
         {tab === "chat" && (
           <ChatTab
@@ -300,7 +292,6 @@ function RoomPage() {
         {tab === "daily" && <DailyTab roomId={roomId} />}
       </div>
 
-      {/* Members footer */}
       <footer className="flex-none px-4 py-2 border-t flex items-center gap-2 overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
         <span className="text-[10px] uppercase tracking-wider font-semibold opacity-40 mr-1 shrink-0 flex items-center gap-1">
           <Users size={10} /> Roommates:
@@ -332,14 +323,12 @@ function RoomPage() {
         ))}
       </footer>
 
-      {/* Roommate Profile Detail Modal */}
       <RoommateModal
         member={selectedMember}
         onClose={() => setSelectedMember(null)}
         onRequestReveal={() => setShowRevealModal(true)}
       />
 
-      {/* Reveal Identity Confirmation Modal */}
       <RevealIdentityModal
         isOpen={showRevealModal}
         onClose={() => setShowRevealModal(false)}
@@ -351,8 +340,6 @@ function RoomPage() {
     </div>
   );
 }
-
-// ─── Chat Tab ────────────────────────────────────────────────────────────────
 
 function ChatTab({
   roomId,

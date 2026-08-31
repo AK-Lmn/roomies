@@ -12,10 +12,6 @@ interface AnimalAvatarProps {
   className?: string;
 }
 
-/**
- * Geometric 2px stroke vector silhouettes for all 16 roommate identities
- * inspired by Lucide & Untitled UI design guidelines.
- */
 function AnimalIcon({ animal, size = 16 }: { animal?: string; size?: number }) {
   const s = size;
   const strokeProps = {
@@ -163,7 +159,6 @@ function AnimalIcon({ animal, size = 16 }: { animal?: string; size?: number }) {
         </svg>
       );
     default:
-      // Minimalist organic totem
       return (
         <svg {...strokeProps}>
           <circle cx="12" cy="12" r="7" />
@@ -217,7 +212,6 @@ export function AnimalAvatar({
         </div>
       )}
 
-      {/* Online indicator dot */}
       {online !== undefined && (
         <span
           className="absolute -bottom-0.5 -right-0.5 rounded-full border-2"

@@ -59,7 +59,6 @@ function HomePage() {
 
   return (
     <div className="min-h-dvh flex flex-col justify-between" style={{ background: "var(--color-bg)" }}>
-      {/* Nav */}
       <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-xs">
@@ -93,7 +92,6 @@ function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-10 space-y-8 my-auto">
         <SignedOut>
           <div className="text-center space-y-6 py-8">
@@ -126,7 +124,6 @@ function HomePage() {
         </SignedOut>
 
         <SignedIn>
-          {/* Active rooms list */}
           {rooms.length > 0 ? (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
@@ -202,7 +199,6 @@ function HomePage() {
         </SignedIn>
       </main>
 
-      {/* Footer */}
       <footer className="px-4 py-3 border-t text-center" style={{ borderColor: "var(--color-border)" }}>
         <p className="text-[11px] opacity-40">Roomies · Ephemeral Cozy Spaces</p>
       </footer>

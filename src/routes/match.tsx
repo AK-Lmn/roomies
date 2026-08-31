@@ -75,7 +75,6 @@ function MatchPage() {
 
   return (
     <div className="min-h-dvh flex flex-col justify-between p-6" style={{ background: "var(--color-bg)" }}>
-      {/* Top Bar */}
       <header className="w-full max-w-sm mx-auto">
         <a
           href="/"
@@ -87,7 +86,6 @@ function MatchPage() {
         </a>
       </header>
 
-      {/* Main Content */}
       <main className="w-full max-w-sm mx-auto my-auto text-center space-y-6">
         {status === "idle" && (
           <div className="space-y-6">
@@ -104,7 +102,6 @@ function MatchPage() {
               </p>
             </div>
 
-            {/* Feature badges */}
             <div className="grid grid-cols-2 gap-2 text-left text-xs pt-1">
               <div className="p-3 rounded-xl border space-y-1" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
                 <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px]">
@@ -136,7 +133,6 @@ function MatchPage() {
 
         {status === "matching" && (
           <div className="space-y-6 py-4">
-            {/* Animated Radar Pulse */}
             <div className="relative mx-auto h-24 w-24 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full bg-amber-500/10 animate-ping" style={{ animationDuration: "2.5s" }} />
               <div className="absolute inset-2 rounded-full bg-amber-500/15 animate-pulse" />
@@ -184,7 +180,6 @@ function MatchPage() {
         )}
       </main>
 
-      {/* Footer spacer */}
       <footer className="w-full max-w-sm mx-auto text-center">
         <p className="text-[11px] opacity-40">Roomies · Ephemeral Cozy Spaces</p>
       </footer>

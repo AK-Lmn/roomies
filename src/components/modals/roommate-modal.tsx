@@ -71,7 +71,6 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
       }
     >
       <div className="space-y-3.5 text-xs">
-        {/* Status Indicator */}
         <div className="flex items-center justify-between p-2.5 rounded-xl border" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}>
           <span className="opacity-70 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${member.online ? "bg-emerald-400" : "bg-neutral-500"}`} />
@@ -85,7 +84,6 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
           )}
         </div>
 
-        {/* Revealed details */}
         {isRevealed && member.profile ? (
           <div className="space-y-3 pt-1">
             {member.profile.bio && (
@@ -94,7 +92,6 @@ export function RoommateModal({ member, onClose, onRequestReveal }: RoommateModa
               </div>
             )}
 
-            {/* Social pills */}
             {member.profile.social && (
               <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wider opacity-40">

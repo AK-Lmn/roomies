@@ -52,7 +52,6 @@ export function Modal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         {(title || icon) && (
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -92,12 +91,10 @@ export function Modal({
           </div>
         )}
 
-        {/* Content Body */}
         <div className="text-sm leading-relaxed" style={{ color: "var(--color-fg)" }}>
           {children}
         </div>
 
-        {/* Footer actions */}
         {footer && <div className="pt-2 flex items-center justify-end gap-2.5">{footer}</div>}
       </div>
     </div>

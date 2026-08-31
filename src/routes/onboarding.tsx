@@ -25,10 +25,8 @@ function OnboardingPage() {
       setChecking(false);
       return;
     }
-    // Pre-fill display name from auth
     const authName = (user as { displayName?: string })?.displayName ?? "";
     setDisplayName(authName.slice(0, LIMITS.displayNameMax));
-    // If already has profile, go home
     getMyProfile()
       .then((p) => {
         if (p) void navigate({ to: "/" });
@@ -87,7 +85,6 @@ function OnboardingPage() {
   return (
     <main className="min-h-dvh flex items-center justify-center p-6" style={{ background: "var(--color-bg)" }}>
       <div className="w-full max-w-sm space-y-6">
-        {/* Header Avatar Preview */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-fit">
             <AnimalAvatar
