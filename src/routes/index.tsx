@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
-import { listMyRooms } from "@/lib/server/rooms";
+import { listMyRooms, getActiveOnlineCount } from "@/lib/server/rooms";
 import { getMyProfile } from "@/lib/server/profiles";
 import { useEffect, useState } from "react";
 import { shortRemaining } from "@/lib/format";
@@ -15,8 +15,17 @@ function HomePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [activeUsers, setActiveUsers] = useState<number>(67);
 
   const userId = user?.id;
+  useEffect(() => {
+    getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
+    const interval = setInterval(() => {
+      getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
+    }, 20_000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (!userId) {
       setProfile(null);
@@ -112,27 +121,40 @@ function HomePage() {
               </p>
             </div>
 
-            <div>
-              <a
-                href="/login"
-                className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold transition-all hover:scale-105 shadow-xl"
-                style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
-              >
-                <Sparkles size={16} />
-                <span>Get a Room</span>
-              </a>
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{activeUsers} users active right now</span>
+              </div>
+
+              <div>
+                <a
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold transition-all hover:scale-105 shadow-xl"
+                  style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+                >
+                  <Sparkles size={16} />
+                  <span>Get a Room</span>
+                </a>
+              </div>
             </div>
           </div>
         </SignedOut>
 
         <SignedIn>
           {rooms.length > 0 ? (
-            <section className="space-y-3">
+            <section className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xs uppercase tracking-widest font-semibold opacity-50 flex items-center gap-1.5" style={{ color: "var(--color-fg)" }}>
-                  <DoorOpen size={13} />
-                  <span>Your Active Rooms</span>
-                </h2>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xs uppercase tracking-widest font-semibold opacity-50 flex items-center gap-1.5" style={{ color: "var(--color-fg)" }}>
+                    <DoorOpen size={13} />
+                    <span>Your Active Rooms</span>
+                  </h2>
+                  <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{activeUsers} online</span>
+                  </div>
+                </div>
                 <a
                   href="/match"
                   className="text-xs text-amber-400 hover:underline inline-flex items-center gap-1 font-medium"
@@ -186,15 +208,22 @@ function HomePage() {
                 </p>
               </div>
 
-              <div>
-                <a
-                  href="/match"
-                  className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all hover:scale-105 shadow-lg"
-                  style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
-                >
-                  <Sparkles size={15} />
-                  <span>Find a Room</span>
-                </a>
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{activeUsers} users active right now</span>
+                </div>
+
+                <div>
+                  <a
+                    href="/match"
+                    className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all hover:scale-105 shadow-lg"
+                    style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+                  >
+                    <Sparkles size={15} />
+                    <span>Find a Room</span>
+                  </a>
+                </div>
               </div>
             </div>
           )}

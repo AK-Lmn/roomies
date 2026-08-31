@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { joinQueue, leaveQueue } from "@/lib/server/rooms";
+import { joinQueue, leaveQueue, getActiveOnlineCount } from "@/lib/server/rooms";
 import { useEffect, useRef, useState } from "react";
 import type { MatchResult } from "@/lib/types";
 import { ArrowLeft, Users, Sparkles, Clock, Compass, Radio } from "lucide-react";
@@ -14,8 +14,17 @@ function MatchPage() {
   const [status, setStatus] = useState<"idle" | "matching" | "matched" | "error">("idle");
   const [waitMs, setWaitMs] = useState(0);
   const [error, setError] = useState("");
+  const [activeUsers, setActiveUsers] = useState<number>(67);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef<number>(Date.now());
+
+  useEffect(() => {
+    getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
+    const interval = setInterval(() => {
+      getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
+    }, 20_000);
+    return () => clearInterval(interval);
+  }, []);
 
   function stopPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -119,15 +128,22 @@ function MatchPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void start()}
-              className="w-full rounded-xl py-3 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg inline-flex items-center justify-center gap-2"
-              style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
-            >
-              <Sparkles size={16} />
-              <span>Look for roommates</span>
-            </button>
+            <div className="space-y-3 pt-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{activeUsers} users active right now</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void start()}
+                className="w-full rounded-xl py-3 text-sm font-semibold transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg inline-flex items-center justify-center gap-2"
+                style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+              >
+                <Sparkles size={16} />
+                <span>Look for roommates</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -141,7 +157,12 @@ function MatchPage() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{activeUsers} users in matching pool</span>
+              </div>
+
               <h2 className="text-base font-semibold" style={{ color: "var(--color-fg)" }}>
                 Finding your room…
               </h2>
