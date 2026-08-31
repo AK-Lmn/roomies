@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
@@ -54,6 +55,7 @@ export default defineConfig(() => ({
     pgliteBootstrapPlugin(),
     tailwindcss(),
     tanstackStart(),
+    nitro(),
     viteReact(),
   ],
 }));

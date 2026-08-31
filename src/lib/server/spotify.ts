@@ -18,8 +18,14 @@ export interface SpotifyStatus {
   isConnected: boolean;
 }
 
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID?.trim() || "";
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
+function getSpotifyClientId(): string {
+  return process.env.SPOTIFY_CLIENT_ID?.trim() || "";
+}
+
+function getSpotifyClientSecret(): string {
+  return process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
+}
+
 const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
   "user-read-playback-state",
@@ -52,7 +58,7 @@ function ensureSpotifySchema(sql: Sql): Promise<void> {
 export const getSpotifyStatus = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<SpotifyStatus> => {
-    const isConfigured = Boolean(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET);
+    const isConfigured = Boolean(getSpotifyClientId() && getSpotifyClientSecret());
     if (!isConfigured) return { isConfigured: false, isConnected: false };
 
     const sql = await getSql();
@@ -73,7 +79,9 @@ export const getSpotifyStatus = createServerFn({ method: "GET" })
 export const getSpotifyAuthUrl = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<{ url: string | null; error?: string }> => {
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    const clientId = getSpotifyClientId();
+    const clientSecret = getSpotifyClientSecret();
+    if (!clientId || !clientSecret) {
       return { url: null, error: "SPOTIFY_NOT_CONFIGURED" };
     }
 
@@ -82,7 +90,7 @@ export const getSpotifyAuthUrl = createServerFn({ method: "GET" })
 
     const params = new URLSearchParams({
       response_type: "code",
-      client_id: SPOTIFY_CLIENT_ID,
+      client_id: clientId,
       scope: SPOTIFY_SCOPES,
       redirect_uri: redirectUri,
       state,
@@ -111,7 +119,7 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
 
   // Refresh token
   try {
-    const basicAuth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64");
+    const basicAuth = Buffer.from(`${getSpotifyClientId()}:${getSpotifyClientSecret()}`).toString("base64");
     const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
       headers: {
@@ -145,7 +153,7 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
 export const getSpotifyNowPlaying = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<SpotifyTrackInfo | null> => {
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return null;
+    if (!getSpotifyClientId() || !getSpotifyClientSecret()) return null;
 
     const sql = await getSql();
     const token = await getValidToken(sql, context.userId);
