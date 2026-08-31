@@ -275,20 +275,16 @@ export const getActiveOnlineCount = createServerFn({ method: "GET" })
       const rows = await sql<{ count: number }>`
         select count(distinct user_id)::int as count
         from (
-          select user_id from room_members where last_seen_at > now() - interval '30 minutes'
+          select user_id from room_members where last_seen_at > now() - interval '15 minutes'
           union
-          select user_id from matching_queue where joined_at > now() - interval '30 minutes'
+          select user_id from matching_queue where joined_at > now() - interval '15 minutes'
           union
-          select user_id from profiles where updated_at > now() - interval '30 minutes'
+          select user_id from profiles where updated_at > now() - interval '15 minutes'
         ) active_users
       `;
       const rawCount = rows[0]?.count ?? 0;
-      const hourOfDay = new Date().getUTCHours();
-      const wave = Math.floor(Math.sin((hourOfDay / 24) * Math.PI * 2) * 8);
-      const baseline = 62 + wave;
-      const totalActive = Math.max(rawCount, baseline + rawCount);
-      return { activeCount: totalActive };
+      return { activeCount: Math.max(1, rawCount) };
     } catch {
-      return { activeCount: 67 };
+      return { activeCount: 1 };
     }
   });

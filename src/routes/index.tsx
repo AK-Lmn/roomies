@@ -124,7 +124,7 @@ function HomePage() {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{activeUsers} users active right now</span>
+                <span>{activeUsers === 1 ? "1 user active right now" : `${activeUsers} users active right now`}</span>
               </div>
 
               <div>
@@ -152,7 +152,7 @@ function HomePage() {
                   </h2>
                   <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{activeUsers} online</span>
+                    <span>{activeUsers === 1 ? "1 online" : `${activeUsers} online`}</span>
                   </div>
                 </div>
                 <a
@@ -211,7 +211,7 @@ function HomePage() {
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{activeUsers} users active right now</span>
+                  <span>{activeUsers === 1 ? "1 user active right now" : `${activeUsers} users active right now`}</span>
                 </div>
 
                 <div>

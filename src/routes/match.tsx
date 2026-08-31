@@ -131,7 +131,7 @@ function MatchPage() {
             <div className="space-y-3 pt-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{activeUsers} users active right now</span>
+                <span>{activeUsers === 1 ? "1 user active right now" : `${activeUsers} users active right now`}</span>
               </div>
 
               <button
@@ -160,7 +160,7 @@ function MatchPage() {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border shadow-xs" style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.25)", color: "#34d399" }}>
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{activeUsers} users in matching pool</span>
+                <span>{activeUsers === 1 ? "1 user in matching pool" : `${activeUsers} users in matching pool`}</span>
               </div>
 
               <h2 className="text-base font-semibold" style={{ color: "var(--color-fg)" }}>
