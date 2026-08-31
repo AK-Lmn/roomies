@@ -142,7 +142,7 @@ function ProfilePage() {
           <ArrowLeft size={14} />
           <span>Home</span>
         </a>
-        <UserButton />
+        <UserButton profile={profile} />
       </header>
 
       <main className="max-w-sm mx-auto px-4 py-8 space-y-6">

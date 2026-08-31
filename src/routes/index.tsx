@@ -105,7 +105,7 @@ function HomePage() {
                 <User size={13} />
                 <span>Profile</span>
               </a>
-              <UserButton />
+              <UserButton profile={profile === "loading" ? null : profile} />
             </SignedIn>
             <SignedOut>
               <a

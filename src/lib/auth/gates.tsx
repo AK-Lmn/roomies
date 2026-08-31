@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
 import { authEnabled, signOut } from "./client";
 import { useCurrentUser, useCurrentUserState } from "./use-current-user";
 import { Modal } from "@/components/ui/modal";
 import { LogOut } from "lucide-react";
+import { getMyProfile } from "@/lib/server/profiles";
+import { getAvatarChoiceByUrl } from "@/lib/avatar-choices";
+import type { Profile } from "@/lib/types";
 
 /**
  * Auth state components — plain wrappers around `useCurrentUserState()`.
@@ -26,13 +29,25 @@ export function RedirectToSignIn({ to = SIGN_IN_PATH }: { to?: string }) {
   return <Navigate to={to} />;
 }
 
-export function UserButton() {
+export function UserButton({ profile }: { profile?: Profile | null }) {
   const user = useCurrentUser();
+  const [fetchedProfile, setFetchedProfile] = useState<Profile | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  useEffect(() => {
+    if (profile !== undefined) return;
+    if (user?.id) {
+      getMyProfile().then(setFetchedProfile).catch(() => {});
+    }
+  }, [user?.id, profile]);
+
   if (!user) return null;
-  const label = user.displayName ?? user.primaryEmail ?? "Account";
+
+  const currentProfile = profile !== undefined ? profile : fetchedProfile;
+  const label = currentProfile?.displayName ?? user.displayName ?? user.primaryEmail ?? "Account";
+  const avatarUrl = currentProfile?.avatarUrl ?? user.profileImageUrl;
+  const avatarChoice = avatarUrl ? getAvatarChoiceByUrl(avatarUrl) : null;
 
   async function handleConfirmSignOut() {
     setSigningOut(true);
@@ -48,17 +63,24 @@ export function UserButton() {
   return (
     <>
       <div className="flex items-center gap-2">
-        {user.profileImageUrl ? (
-          <img
-            src={user.profileImageUrl}
-            alt=""
-            className="h-8 w-8 rounded-full object-cover border"
-            style={{ borderColor: "var(--color-border)" }}
-          />
+        {avatarUrl ? (
+          <div
+            className="h-8 w-8 rounded-full overflow-hidden border p-0.5 shrink-0 flex items-center justify-center shadow-xs"
+            style={{
+              borderColor: avatarChoice?.color ?? "var(--color-border)",
+              background: "var(--color-surface2)",
+            }}
+          >
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-full w-full object-contain rounded-full"
+            />
+          </div>
         ) : (
           <span
-            className="grid h-8 w-8 place-items-center rounded-full text-xs font-semibold text-white shadow-xs"
-            style={{ background: "var(--color-primary)" }}
+            className="grid h-8 w-8 place-items-center rounded-full text-xs font-semibold text-white shadow-xs shrink-0"
+            style={{ background: avatarChoice?.color ?? "var(--color-primary)" }}
           >
             {label.charAt(0).toUpperCase()}
           </span>
