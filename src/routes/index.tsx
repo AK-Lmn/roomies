@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
-import { listMyRooms, getActiveOnlineCount } from "@/lib/server/rooms";
+import { listMyRooms, getActiveOnlineCount, leaveRoom } from "@/lib/server/rooms";
 import { getMyProfile } from "@/lib/server/profiles";
 import { useEffect, useState } from "react";
 import { shortRemaining } from "@/lib/format";
 import type { RoomSummary, Profile } from "@/lib/types";
-import { Users, Clock, Compass, Sparkles, ChevronRight, DoorOpen, Radio, User } from "lucide-react";
+import { Users, Clock, Compass, Sparkles, ChevronRight, DoorOpen, Radio, User, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -16,6 +16,16 @@ function HomePage() {
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [activeUsers, setActiveUsers] = useState<number>(1);
+
+  async function handleLeaveRoom(roomId: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to leave this room?")) return;
+    try {
+      await leaveRoom({ data: { roomId } });
+      setRooms((prev) => prev.filter((r) => r.id !== roomId));
+    } catch {}
+  }
 
   const userId = user?.id;
   useEffect(() => {
@@ -194,8 +204,19 @@ function HomePage() {
                       </div>
                     </div>
 
-                    <div className="h-8 w-8 rounded-xl flex items-center justify-center border transition-colors group-hover:bg-neutral-800" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)", color: "var(--color-muted)" }}>
-                      <ChevronRight size={16} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => void handleLeaveRoom(room.id, e)}
+                        className="h-8 w-8 rounded-xl flex items-center justify-center border transition-colors hover:bg-rose-500/10 hover:border-rose-500/30 text-neutral-400 hover:text-rose-400"
+                        style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
+                        title="Leave Room"
+                      >
+                        <LogOut size={14} />
+                      </button>
+                      <div className="h-8 w-8 rounded-xl flex items-center justify-center border transition-colors group-hover:bg-neutral-800" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)", color: "var(--color-muted)" }}>
+                        <ChevronRight size={16} />
+                      </div>
                     </div>
                   </a>
                 ))}

@@ -288,3 +288,26 @@ export const getActiveOnlineCount = createServerFn({ method: "GET" })
       return { activeCount: 1 };
     }
   });
+
+// ─── leave room ─────────────────────────────────────────────────────────────
+
+export const leaveRoom = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ roomId: z.string() }))
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const userId = context.userId;
+
+    await sql`delete from room_members where room_id = ${data.roomId} and user_id = ${userId}`;
+
+    // Archive room if empty
+    const remaining = await sql<{ count: number }>`
+      select count(*)::int as count from room_members where room_id = ${data.roomId}
+    `;
+    if ((remaining[0]?.count ?? 0) === 0) {
+      await sql`update rooms set status = 'archived' where id = ${data.roomId}`;
+    }
+
+    return { ok: true };
+  });
+

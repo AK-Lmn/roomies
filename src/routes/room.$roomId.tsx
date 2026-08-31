@@ -1,7 +1,7 @@
 import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { getRoom, pingPresence, revealIdentity } from "@/lib/server/rooms";
+import { getRoom, pingPresence, revealIdentity, leaveRoom } from "@/lib/server/rooms";
 import { getMessages, sendMessage } from "@/lib/server/messages";
 import {
   getWallPosts,
@@ -37,6 +37,7 @@ import { RoommateModal } from "@/components/modals/roommate-modal";
 import { RevealIdentityModal } from "@/components/modals/reveal-identity-modal";
 import { SpotifySetupModal, SpotifyDisconnectModal } from "@/components/modals/spotify-modals";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { Modal } from "@/components/ui/modal";
 import { compressImage } from "@/lib/image-compress";
 import { sendBackgroundNotification, requestNotificationPermission } from "@/lib/notifications";
 import {
@@ -62,6 +63,7 @@ import {
   Radio,
   Plus,
   ArrowLeft,
+  LogOut,
   Image as ImageIcon,
 } from "lucide-react";
 
@@ -95,6 +97,19 @@ function RoomPage() {
   const [revealing, setRevealing] = useState(false);
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<RoomView["members"][0] | null>(null);
+
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  async function handleConfirmLeave() {
+    setLeaving(true);
+    try {
+      await leaveRoom({ data: { roomId } });
+      void navigate({ to: "/" });
+    } catch {
+      setLeaving(false);
+    }
+  }
 
   // Incoming P2P events dispatcher refs
   const onIncomingChatRef = useRef<((msg: ChatMessage) => void) | null>(null);
@@ -242,6 +257,16 @@ function RoomPage() {
             {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setShowLeaveModal(true)}
+            className="p-1.5 sm:p-2 rounded-lg opacity-80 hover:opacity-100 transition-all border text-rose-400 hover:text-rose-300"
+            title="Leave Room"
+            style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
+          >
+            <LogOut size={14} />
+          </button>
+
           {me && !me.revealed && (
             <button
               type="button"
@@ -370,6 +395,39 @@ function RoomPage() {
         currentPersona={me?.tempIdentity}
         realName={me?.profile?.displayName ?? user?.displayName ?? undefined}
       />
+
+      <Modal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        title="Leave Room"
+        subtitle={`Are you sure you want to leave ${room.name}?`}
+        icon={<LogOut size={20} className="text-rose-400" />}
+        iconBg="rgba(244, 63, 94, 0.15)"
+      >
+        <div className="space-y-4">
+          <p className="text-xs leading-relaxed" style={{ color: "var(--color-muted)" }}>
+            Leaving this room will remove your member profile and note attachments from this shared space.
+          </p>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowLeaveModal(false)}
+              className="px-3.5 py-2 rounded-xl text-xs font-medium border hover:bg-neutral-800 transition-colors"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-fg)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={leaving}
+              onClick={() => void handleConfirmLeave()}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 transition-colors shadow-md"
+            >
+              {leaving ? "Leaving…" : "Leave Room"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

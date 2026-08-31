@@ -14,7 +14,7 @@ export const LIMITS = {
   reportReasonMax: 400,
   socialUrlMax: 200,
   imageDataMax: 180_000,
-  roomMin: 1,
+  roomMin: 2,
   roomTarget: 4,
   roomMax: 8,
   matchWaitMs: 8_000,
