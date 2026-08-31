@@ -1,0 +1,1392 @@
+import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { RedirectToSignIn } from "@/lib/auth/gates";
+import { getRoom, pingPresence, revealIdentity } from "@/lib/server/rooms";
+import { getMessages, sendMessage } from "@/lib/server/messages";
+import {
+  getWallPosts,
+  createWallPost,
+  toggleReaction,
+  getFridgeNotes,
+  addFridgeNote,
+  deleteFridgeNote,
+  getSongs,
+  addSong,
+  getDailyQuestion,
+  submitDailyAnswer,
+} from "@/lib/server/content";
+import { searchTracks, fetchTrackMetadata, type TrackSearchResult } from "@/lib/server/music-search";
+import {
+  getSpotifyStatus,
+  getSpotifyAuthUrl,
+  getSpotifyNowPlaying,
+  disconnectSpotify,
+  type SpotifyTrackInfo,
+  type SpotifyStatus,
+} from "@/lib/server/spotify";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { remainingLabel, timeAgo, clockTime } from "@/lib/format";
+import { LIMITS } from "@/lib/limits";
+import { useP2PRoom } from "@/lib/multiplayer/use-p2p-room";
+import { MediaEmbed } from "@/components/media-embed";
+import { AnimalAvatar } from "@/components/animal-avatar";
+import { ReactionButton, REACTION_TYPES } from "@/components/reaction-button";
+import { sound } from "@/lib/sound";
+import type { RoomView, ChatMessage, WallPost, FridgeNote, Song, DailyQuestionView } from "@/lib/types";
+import { RoommateModal } from "@/components/modals/roommate-modal";
+import { RevealIdentityModal } from "@/components/modals/reveal-identity-modal";
+import { SpotifySetupModal, SpotifyDisconnectModal } from "@/components/modals/spotify-modals";
+import {
+  Volume2,
+  VolumeX,
+  KeyRound,
+  BadgeCheck,
+  MessageSquare,
+  LayoutGrid,
+  StickyNote,
+  Music2,
+  HelpCircle,
+  Users,
+  Clock,
+  Search,
+  Link2,
+  Disc3,
+  ExternalLink,
+  Trash2,
+  Sparkles,
+  Send,
+  X,
+  Radio,
+  Plus,
+  ArrowLeft,
+} from "lucide-react";
+
+export const Route = createFileRoute("/room/$roomId")({ component: RoomPage });
+
+type Tab = "chat" | "wall" | "fridge" | "music" | "daily";
+
+const TABS: Array<{ id: Tab; label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+  { id: "chat", label: "Chat", Icon: MessageSquare },
+  { id: "wall", label: "Wall", Icon: LayoutGrid },
+  { id: "fridge", label: "Fridge", Icon: StickyNote },
+  { id: "music", label: "Music", Icon: Music2 },
+  { id: "daily", label: "Daily Q", Icon: HelpCircle },
+];
+
+function RoomPage() {
+  const { roomId } = useParams({ from: "/room/$roomId" });
+  const { user, isPending } = useCurrentUserState();
+  const navigate = useNavigate();
+  const [room, setRoom] = useState<RoomView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>("chat");
+  const [muted, setMuted] = useState(sound.isMuted());
+  const [revealing, setRevealing] = useState(false);
+  const [showRevealModal, setShowRevealModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<RoomView["members"][0] | null>(null);
+
+  // Incoming P2P events dispatcher refs
+  const onIncomingChatRef = useRef<((msg: ChatMessage) => void) | null>(null);
+  const onIncomingReactionRef = useRef<((postId: string, kind: string) => void) | null>(null);
+  const onIncomingNoteRef = useRef<(() => void) | null>(null);
+
+  const me = room?.members.find((m) => m.isMe);
+
+  const p2p = useP2PRoom({
+    roomId,
+    userId: user?.id ?? "",
+    name: me?.tempIdentity ?? "Roomie",
+    onChatMessage: (msg) => {
+      sound.playChime();
+      onIncomingChatRef.current?.(msg);
+    },
+    onReaction: (postId, kind) => {
+      onIncomingReactionRef.current?.(postId, kind);
+    },
+    onNoteAdded: () => {
+      onIncomingNoteRef.current?.();
+    },
+  });
+
+  async function refreshRoom() {
+    try {
+      const r = await getRoom({ data: { roomId } });
+      if (!r) {
+        void navigate({ to: "/" });
+        return;
+      }
+      setRoom(r);
+    } catch {
+      void navigate({ to: "/" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    void refreshRoom();
+    const presencePing = setInterval(() => void pingPresence({ data: { roomId } }).catch(() => {}), 30_000);
+    const roomRefresh = setInterval(() => void refreshRoom(), 15_000);
+    return () => {
+      clearInterval(presencePing);
+      clearInterval(roomRefresh);
+    };
+  }, [user, roomId]);
+
+  if (isPending || loading) {
+    return (
+      <div className="grid min-h-dvh place-items-center" style={{ background: "var(--color-bg)", color: "var(--color-muted)" }}>
+        <div className="flex items-center gap-2 text-sm">
+          <Radio size={16} className="animate-spin text-amber-500" />
+          <span>Loading room…</span>
+        </div>
+      </div>
+    );
+  }
+  if (!user) return <RedirectToSignIn />;
+  if (!room) return null;
+
+  const onlineCount = room.members.filter((m) => m.online).length;
+
+  async function handleConfirmReveal() {
+    setRevealing(true);
+    try {
+      await revealIdentity({ data: { roomId } });
+      await refreshRoom();
+      setShowRevealModal(false);
+    } finally {
+      setRevealing(false);
+    }
+  }
+
+  function handleToggleSound() {
+    const isMute = sound.toggleMute();
+    setMuted(isMute);
+  }
+
+  return (
+    <div className="flex flex-col h-dvh" style={{ background: "var(--color-bg)" }}>
+      {/* Header */}
+      <header className="flex-none flex items-center justify-between gap-3 px-4 py-2.5 border-b" style={{ borderColor: "var(--color-border)" }}>
+        <div className="flex items-center gap-3 min-w-0">
+          <a href="/" className="opacity-60 hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-neutral-800">
+            <ArrowLeft size={16} />
+          </a>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold truncate" style={{ color: "var(--color-fg)" }}>
+                {room.name}
+              </span>
+              {/* Connection Status Pill */}
+              <span
+                className="hidden sm:inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors"
+                style={{
+                  background: p2p.connected ? "rgba(122, 158, 135, 0.15)" : "var(--color-surface2)",
+                  color: p2p.connected ? "var(--color-accent)" : "var(--color-muted)",
+                  border: "1px solid var(--color-border)",
+                }}
+                title={p2p.connected ? `Connected to room mesh (${p2p.peers.length} active peers)` : "Connecting to room mesh..."}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${p2p.connected ? "bg-emerald-400" : "bg-neutral-500"}`} />
+                <span>{p2p.connected ? "Connected" : "Connecting"}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-muted)" }}>
+              <span className="flex items-center gap-1">
+                <Users size={11} /> {onlineCount} online
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <Clock size={11} /> {remainingLabel(room.remainingMs)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right action controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Sound Mute Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleSound}
+            className="p-2 rounded-lg opacity-80 hover:opacity-100 transition-all border text-[var(--color-fg)]"
+            title={muted ? "Unmute sound cues" : "Mute sound cues"}
+            style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
+          >
+            {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
+
+          {/* Reveal button */}
+          {me && !me.revealed && (
+            <button
+              type="button"
+              disabled={revealing}
+              onClick={() => setShowRevealModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all hover:opacity-90 disabled:opacity-50 border border-amber-500/40 bg-amber-500/10 text-amber-300 shadow-xs"
+            >
+              <KeyRound size={13} />
+              <span>Reveal Profile</span>
+            </button>
+          )}
+
+          {/* My identity chip */}
+          {me && (
+            <div
+              className="flex items-center gap-2 px-2.5 py-1 rounded-full cursor-pointer hover:bg-neutral-800 transition-all border"
+              style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
+              onClick={() => setSelectedMember(me)}
+            >
+              <AnimalAvatar
+                animal={me.identityAnimal}
+                color={me.identityColor}
+                size={22}
+                revealed={me.revealed}
+                displayName={me.profile?.displayName}
+              />
+              <span className="text-xs font-medium" style={{ color: "var(--color-fg)" }}>
+                {me.revealed && me.profile?.displayName ? me.profile.displayName : me.tempIdentity}
+              </span>
+              {me.revealed && <BadgeCheck size={13} className="text-amber-400 shrink-0" />}
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Tabs */}
+      <nav className="flex-none flex border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
+        {TABS.map(({ id: t, label, Icon }) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className="flex-1 min-w-0 py-2.5 px-3 inline-flex items-center justify-center gap-1.5 text-xs font-medium transition-colors"
+            style={{
+              color: tab === t ? "var(--color-primary)" : "var(--color-muted)",
+              borderBottom: tab === t ? "2px solid var(--color-primary)" : "2px solid transparent",
+            }}
+          >
+            <Icon size={13} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-hidden">
+        {tab === "chat" && (
+          <ChatTab
+            roomId={roomId}
+            members={room.members}
+            p2p={p2p}
+            myIdentity={me?.tempIdentity ?? "Roomie"}
+            onIncomingChatRef={onIncomingChatRef}
+          />
+        )}
+        {tab === "wall" && (
+          <WallTab
+            roomId={roomId}
+            p2p={p2p}
+            onIncomingReactionRef={onIncomingReactionRef}
+          />
+        )}
+        {tab === "fridge" && (
+          <FridgeTab
+            roomId={roomId}
+            p2p={p2p}
+            onIncomingNoteRef={onIncomingNoteRef}
+          />
+        )}
+        {tab === "music" && <MusicTab roomId={roomId} />}
+        {tab === "daily" && <DailyTab roomId={roomId} />}
+      </div>
+
+      {/* Members footer */}
+      <footer className="flex-none px-4 py-2 border-t flex items-center gap-2 overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
+        <span className="text-[10px] uppercase tracking-wider font-semibold opacity-40 mr-1 shrink-0 flex items-center gap-1">
+          <Users size={10} /> Roommates:
+        </span>
+        {room.members.map((m) => (
+          <button
+            key={m.userId}
+            type="button"
+            onClick={() => setSelectedMember(m)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-full shrink-0 transition-opacity hover:opacity-80 border"
+            style={{
+              background: m.isMe ? "rgba(194, 144, 90, 0.15)" : "var(--color-surface2)",
+              borderColor: "var(--color-border)",
+            }}
+          >
+            <AnimalAvatar
+              animal={m.identityAnimal}
+              color={m.identityColor}
+              size={18}
+              revealed={m.revealed}
+              displayName={m.profile?.displayName}
+              online={m.online}
+            />
+            <span className="text-xs truncate max-w-[90px]" style={{ color: "var(--color-fg)" }}>
+              {m.revealed && m.profile?.displayName ? m.profile.displayName : m.tempIdentity}
+            </span>
+            {m.revealed && <BadgeCheck size={11} className="text-amber-400 shrink-0" />}
+          </button>
+        ))}
+      </footer>
+
+      {/* Roommate Profile Detail Modal */}
+      <RoommateModal
+        member={selectedMember}
+        onClose={() => setSelectedMember(null)}
+        onRequestReveal={() => setShowRevealModal(true)}
+      />
+
+      {/* Reveal Identity Confirmation Modal */}
+      <RevealIdentityModal
+        isOpen={showRevealModal}
+        onClose={() => setShowRevealModal(false)}
+        onConfirm={() => void handleConfirmReveal()}
+        isSubmitting={revealing}
+        currentPersona={me?.tempIdentity}
+        realName={me?.profile?.displayName ?? user?.displayName ?? undefined}
+      />
+    </div>
+  );
+}
+
+// ─── Chat Tab ────────────────────────────────────────────────────────────────
+
+function ChatTab({
+  roomId,
+  members,
+  p2p,
+  myIdentity,
+  onIncomingChatRef,
+}: {
+  roomId: string;
+  members: RoomView["members"];
+  p2p: ReturnType<typeof useP2PRoom>;
+  myIdentity: string;
+  onIncomingChatRef: React.MutableRefObject<((msg: ChatMessage) => void) | null>;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  async function loadMessages() {
+    const msgs = await getMessages({ data: { roomId } });
+    setMessages(msgs);
+  }
+
+  useEffect(() => {
+    void loadMessages();
+    const interval = setInterval(() => void loadMessages(), 8000);
+    return () => clearInterval(interval);
+  }, [roomId]);
+
+  useEffect(() => {
+    onIncomingChatRef.current = (incomingMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incomingMsg.id)) return prev;
+        return [...prev, incomingMsg];
+      });
+    };
+    return () => {
+      onIncomingChatRef.current = null;
+    };
+  }, [onIncomingChatRef]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  function getMember(userId: string) {
+    return members.find((m) => m.userId === userId);
+  }
+
+  async function handleSend(e?: FormEvent) {
+    e?.preventDefault();
+    const text = body.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setBody("");
+    p2p.sendTyping(false, myIdentity);
+    sound.playPop();
+
+    try {
+      const res = await sendMessage({ data: { roomId, body: text } });
+      const meMember = members.find((m) => m.isMe);
+      const localMsg: ChatMessage = {
+        id: res.id,
+        roomId,
+        userId: meMember?.userId ?? "me",
+        body: text,
+        createdAt: new Date().toISOString(),
+        identity: meMember?.tempIdentity ?? myIdentity,
+        animal: meMember?.identityAnimal ?? "Fox",
+        color: meMember?.identityColor ?? "#c2905a",
+        revealedName: meMember?.revealed && meMember.profile?.displayName ? meMember.profile.displayName : null,
+        isMe: true,
+      };
+      setMessages((prev) => [...prev, localMsg]);
+      p2p.broadcastChat({ ...localMsg, isMe: false });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleKey(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSend();
+    }
+  }
+
+  function handleInputChange(val: string) {
+    setBody(val);
+    if (val.trim()) {
+      p2p.sendTyping(true, myIdentity);
+    } else {
+      p2p.sendTyping(false, myIdentity);
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {messages.length === 0 && (
+          <div className="text-center py-12 space-y-2" style={{ color: "var(--color-muted)" }}>
+            <div className="mx-auto h-10 w-10 rounded-full flex items-center justify-center bg-neutral-800/80 text-neutral-400">
+              <MessageSquare size={18} />
+            </div>
+            <p className="text-sm font-medium">Your room is ready</p>
+            <p className="text-xs">Send a message to say hello to your new roommates.</p>
+          </div>
+        )}
+        {messages.map((msg) => {
+          const member = getMember(msg.userId);
+          const authorColor = member?.identityColor ?? msg.color ?? "#888";
+          const authorAnimal = member?.identityAnimal ?? msg.animal ?? "Fox";
+
+          return (
+            <div key={msg.id} className={`flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
+              <AnimalAvatar
+                animal={authorAnimal}
+                color={authorColor}
+                size={28}
+                revealed={member?.revealed ?? Boolean(msg.revealedName)}
+                displayName={msg.revealedName}
+                className="mt-0.5"
+              />
+              <div className={`max-w-[75%] space-y-0.5 ${msg.isMe ? "items-end" : "items-start"} flex flex-col`}>
+                <div className="text-[10px]" style={{ color: "var(--color-muted)" }}>
+                  {msg.revealedName ? `${msg.revealedName} (${msg.identity})` : msg.identity} · {clockTime(msg.createdAt)}
+                </div>
+                <div
+                  className="px-3.5 py-2 rounded-2xl text-sm leading-relaxed shadow-xs"
+                  style={{
+                    background: msg.isMe ? "var(--color-primary)" : "var(--color-surface2)",
+                    color: msg.isMe ? "var(--color-primary-fg)" : "var(--color-fg)",
+                    border: msg.isMe ? "none" : "1px solid var(--color-border)",
+                  }}
+                >
+                  {msg.body}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Typing Indicator Bar */}
+      {p2p.typingUsers.length > 0 && (
+        <div className="px-4 py-1 text-[11px] italic flex items-center gap-2" style={{ color: "var(--color-muted)" }}>
+          <Radio size={12} className="animate-pulse text-amber-400" />
+          <span>{p2p.typingUsers.join(", ")} is typing…</span>
+        </div>
+      )}
+
+      {/* Input */}
+      <form onSubmit={(e) => void handleSend(e)} className="flex-none flex gap-2 px-3 py-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+        <textarea
+          value={body}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Say something to the room…"
+          maxLength={LIMITS.messageMax}
+          rows={1}
+          className="flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
+          style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+        />
+        <button
+          type="submit"
+          disabled={!body.trim() || sending}
+          className="rounded-lg px-4 py-2 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-40 inline-flex items-center gap-1.5"
+          style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+        >
+          <Send size={13} />
+          <span>Send</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Wall Tab ────────────────────────────────────────────────────────────────
+
+function WallTab({
+  roomId,
+  p2p,
+  onIncomingReactionRef,
+}: {
+  roomId: string;
+  p2p: ReturnType<typeof useP2PRoom>;
+  onIncomingReactionRef: React.MutableRefObject<((postId: string, kind: string) => void) | null>;
+}) {
+  const [posts, setPosts] = useState<WallPost[]>([]);
+  const [body, setBody] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  async function load() {
+    const p = await getWallPosts({ data: { roomId } });
+    setPosts(p);
+  }
+
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 10_000);
+    return () => clearInterval(t);
+  }, [roomId]);
+
+  useEffect(() => {
+    onIncomingReactionRef.current = () => {
+      sound.playHeart();
+      void load();
+    };
+    return () => {
+      onIncomingReactionRef.current = null;
+    };
+  }, [onIncomingReactionRef]);
+
+  async function post(e: FormEvent) {
+    e.preventDefault();
+    if (!body.trim() || posting) return;
+    setPosting(true);
+    sound.playPop();
+    await createWallPost({ data: { roomId, body: body.trim(), imageUrl: null } });
+    setBody("");
+    await load();
+    setPosting(false);
+  }
+
+  async function react(postId: string, kind: string) {
+    sound.playHeart();
+    p2p.broadcastReaction(postId, kind);
+    await toggleReaction({ data: { postId, kind } });
+    await load();
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {posts.length === 0 && (
+          <div className="text-center py-12 space-y-2" style={{ color: "var(--color-muted)" }}>
+            <div className="mx-auto h-10 w-10 rounded-full flex items-center justify-center bg-neutral-800/80 text-neutral-400">
+              <LayoutGrid size={18} />
+            </div>
+            <p className="text-sm font-medium">The wall is blank</p>
+            <p className="text-xs">Post thoughts, jokes, or stories for your roommates to see.</p>
+          </div>
+        )}
+        {posts.map((postItem) => (
+          <div
+            key={postItem.id}
+            className="rounded-xl p-4 space-y-2.5 shadow-xs"
+            style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+          >
+            <div className="flex items-center gap-2.5">
+              <AnimalAvatar
+                animal={postItem.animal}
+                color={postItem.color}
+                size={24}
+                revealed={Boolean(postItem.revealedName)}
+                displayName={postItem.revealedName}
+              />
+              <span className="text-xs" style={{ color: "var(--color-muted)" }}>
+                {postItem.revealedName ? `${postItem.revealedName} (${postItem.identity})` : postItem.identity} · {timeAgo(postItem.createdAt)}
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "var(--color-fg)" }}>
+              {postItem.body}
+            </p>
+            <div className="flex gap-1.5 flex-wrap pt-1">
+              {REACTION_TYPES.map(({ kind }) => {
+                const existing = postItem.reactions.find((x) => x.kind === kind);
+                return (
+                  <ReactionButton
+                    key={kind}
+                    kind={kind}
+                    count={existing?.count || 0}
+                    mine={Boolean(existing?.mine)}
+                    onClick={() => void react(postItem.id, kind)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={(e) => void post(e)} className="flex-none flex gap-2 px-3 py-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Post something to the room wall…"
+          maxLength={LIMITS.wallPostMax}
+          rows={2}
+          className="flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
+          style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+        />
+        <button
+          type="submit"
+          disabled={!body.trim() || posting}
+          className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-40 hover:opacity-80 inline-flex items-center gap-1"
+          style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+        >
+          <Plus size={14} />
+          <span>Post</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Fridge Tab ──────────────────────────────────────────────────────────────
+
+const NOTE_PALETTE = [
+  { label: "Warm Butter", value: "#FBE8A6" },
+  { label: "Mint Sage", value: "#BCECE0" },
+  { label: "Blush Rose", value: "#F4B6C2" },
+  { label: "Powder Sky", value: "#BEE3F8" },
+  { label: "Soft Lavender", value: "#E9D8FD" },
+];
+
+function FridgeTab({
+  roomId,
+  p2p,
+  onIncomingNoteRef,
+}: {
+  roomId: string;
+  p2p: ReturnType<typeof useP2PRoom>;
+  onIncomingNoteRef: React.MutableRefObject<(() => void) | null>;
+}) {
+  const [notes, setNotes] = useState<FridgeNote[]>([]);
+  const [body, setBody] = useState("");
+  const [selectedColor, setSelectedColor] = useState(NOTE_PALETTE[0].value);
+  const [adding, setAdding] = useState(false);
+
+  async function load() {
+    setNotes(await getFridgeNotes({ data: { roomId } }));
+  }
+  useEffect(() => {
+    void load();
+  }, [roomId]);
+
+  useEffect(() => {
+    onIncomingNoteRef.current = () => {
+      sound.playPop();
+      void load();
+    };
+    return () => {
+      onIncomingNoteRef.current = null;
+    };
+  }, [onIncomingNoteRef]);
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    if (!body.trim() || adding) return;
+    setAdding(true);
+    sound.playPop();
+    const res = await addFridgeNote({ data: { roomId, body: body.trim(), color: selectedColor } });
+    p2p.broadcastNoteAdded(res.id);
+    setBody("");
+    await load();
+    setAdding(false);
+  }
+
+  async function handleDelete(noteId: string) {
+    sound.playUnstick();
+    await deleteFridgeNote({ data: { noteId } });
+    await load();
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4">
+        {notes.length === 0 && (
+          <div className="text-center py-12 space-y-2" style={{ color: "var(--color-muted)" }}>
+            <div className="mx-auto h-10 w-10 rounded-full flex items-center justify-center bg-neutral-800/80 text-neutral-400">
+              <StickyNote size={18} />
+            </div>
+            <p className="text-sm font-medium">The fridge is empty</p>
+            <p className="text-xs">Stick a note: rules, grocery lists, or random reminders.</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+          {notes.map((note) => (
+            <div
+              key={note.id}
+              className="relative group rounded-xl p-4 text-sm leading-snug transition-transform hover:scale-105"
+              style={{
+                background: note.color,
+                color: "#1a1916",
+                transform: `rotate(${note.tilt}deg)`,
+                boxShadow: "0 6px 16px rgba(0,0,0,0.3)",
+              }}
+            >
+              {/* Magnetic metallic pin */}
+              <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-tr from-neutral-800 to-neutral-400 shadow-xs" />
+                {note.isMe && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(note.id)}
+                    className="opacity-0 group-hover:opacity-100 text-neutral-800 hover:text-red-700 p-0.5 rounded transition-all"
+                    title="Remove note"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[10px] font-bold mb-2 opacity-50 uppercase tracking-wider">
+                {note.identity}
+              </p>
+              <p className="font-sans text-xs whitespace-pre-wrap leading-relaxed">{note.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <form onSubmit={(e) => void add(e)} className="flex-none flex flex-col sm:flex-row gap-2 px-3 py-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+        {/* Color Palette Picker */}
+        <div className="flex items-center gap-1.5 self-center sm:self-auto py-1 sm:py-0">
+          {NOTE_PALETTE.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setSelectedColor(c.value)}
+              className={`h-6 w-6 rounded-full transition-transform ${
+                selectedColor === c.value ? "scale-110 ring-2 ring-amber-400 ring-offset-2 ring-offset-neutral-900" : "opacity-75 hover:opacity-100"
+              }`}
+              style={{ background: c.value }}
+              title={c.label}
+            />
+          ))}
+        </div>
+
+        <input
+          type="text"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Write a sticky note for the fridge…"
+          maxLength={LIMITS.fridgeNoteMax}
+          className="flex-1 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
+          style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+        />
+        <button
+          type="submit"
+          disabled={!body.trim() || adding}
+          className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40 hover:opacity-80 inline-flex items-center gap-1 shrink-0"
+          style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+        >
+          <Plus size={14} />
+          <span>Stick Note</span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── Music Tab ───────────────────────────────────────────────────────────────
+
+function MusicTab({ roomId }: { roomId: string }) {
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [activeTab, setActiveTab] = useState<"search" | "paste">("search");
+
+  // Instant Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<TrackSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
+
+  // Smart Paste State
+  const [pasteUrl, setPasteUrl] = useState("");
+  const [pastedTitle, setPastedTitle] = useState("");
+  const [pastedArtist, setPastedArtist] = useState("");
+  const [pastedCover, setPastedCover] = useState<string | null>(null);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const [isAddingPasted, setIsAddingPasted] = useState(false);
+
+  // Spotify Live State
+  const [spotifyStatus, setSpotifyStatus] = useState<SpotifyStatus>({ isConfigured: false, isConnected: false });
+  const [nowPlaying, setNowPlaying] = useState<SpotifyTrackInfo | null>(null);
+  const [isSharingNowPlaying, setIsSharingNowPlaying] = useState(false);
+  const [showSpotifySetupModal, setShowSpotifySetupModal] = useState(false);
+  const [showSpotifyDisconnectModal, setShowSpotifyDisconnectModal] = useState(false);
+  const [isDisconnectingSpotify, setIsDisconnectingSpotify] = useState(false);
+
+  async function loadSongs() {
+    setSongs(await getSongs({ data: { roomId } }));
+  }
+
+  async function checkSpotify() {
+    try {
+      const status = await getSpotifyStatus();
+      setSpotifyStatus(status);
+      if (status.isConnected) {
+        const np = await getSpotifyNowPlaying();
+        setNowPlaying(np);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    void loadSongs();
+    void checkSpotify();
+    const interval = setInterval(() => {
+      void checkSpotify();
+    }, 12_000);
+    return () => clearInterval(interval);
+  }, [roomId]);
+
+  // Debounced Instant Search
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchTracks({ data: { query: q } });
+        setSearchResults(results);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Smart Paste URL auto-resolve
+  async function handlePasteUrlChange(urlVal: string) {
+    setPasteUrl(urlVal);
+    const trimmed = urlVal.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      setIsFetchingMeta(true);
+      try {
+        const meta = await fetchTrackMetadata({ data: { url: trimmed } });
+        if (meta) {
+          setPastedTitle(meta.title);
+          setPastedArtist(meta.artist);
+          setPastedCover(meta.coverUrl);
+        }
+      } finally {
+        setIsFetchingMeta(false);
+      }
+    }
+  }
+
+  // Add search result
+  async function handleAddSearchResult(track: TrackSearchResult) {
+    setAddingTrackId(track.id);
+    sound.playPop();
+    try {
+      await addSong({
+        data: {
+          roomId,
+          title: track.title,
+          artist: track.artist,
+          url: track.url,
+          coverUrl: track.coverUrl,
+        },
+      });
+      await loadSongs();
+      setSearchQuery("");
+      setSearchResults([]);
+    } finally {
+      setAddingTrackId(null);
+    }
+  }
+
+  // Add pasted link
+  async function handleAddPastedSong(e: FormEvent) {
+    e.preventDefault();
+    if (!pasteUrl.trim() || isAddingPasted) return;
+    setIsAddingPasted(true);
+    sound.playPop();
+    try {
+      await addSong({
+        data: {
+          roomId,
+          title: pastedTitle.trim() || "Shared Track",
+          artist: pastedArtist.trim() || "Artist",
+          url: pasteUrl.trim(),
+          coverUrl: pastedCover,
+        },
+      });
+      setPasteUrl("");
+      setPastedTitle("");
+      setPastedArtist("");
+      setPastedCover(null);
+      await loadSongs();
+    } finally {
+      setIsAddingPasted(false);
+    }
+  }
+
+  // Share live Spotify Now Playing track
+  async function handleShareNowPlaying() {
+    if (!nowPlaying || isSharingNowPlaying) return;
+    setIsSharingNowPlaying(true);
+    sound.playPop();
+    try {
+      await addSong({
+        data: {
+          roomId,
+          title: nowPlaying.title,
+          artist: nowPlaying.artist,
+          url: nowPlaying.url,
+          coverUrl: nowPlaying.coverUrl,
+        },
+      });
+      await loadSongs();
+    } finally {
+      setIsSharingNowPlaying(false);
+    }
+  }
+
+  // Connect Spotify OAuth popup
+  async function handleConnectSpotify() {
+    try {
+      const res = await getSpotifyAuthUrl();
+      if (res.url) {
+        window.open(res.url, "spotify_auth", "width=600,height=700,scrollbars=yes");
+      } else {
+        setShowSpotifySetupModal(true);
+      }
+    } catch {
+      setShowSpotifySetupModal(true);
+    }
+  }
+
+  async function handleConfirmDisconnectSpotify() {
+    setIsDisconnectingSpotify(true);
+    try {
+      await disconnectSpotify();
+      setSpotifyStatus({ ...spotifyStatus, isConnected: false });
+      setNowPlaying(null);
+      setShowSpotifyDisconnectModal(false);
+    } finally {
+      setIsDisconnectingSpotify(false);
+    }
+  }
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Top Header & Search Area */}
+      <div className="flex-none p-3.5 space-y-3 border-b" style={{ borderColor: "var(--color-border)" }}>
+        {/* Live Spotify Banner (if connected) */}
+        {spotifyStatus.isConnected && nowPlaying && (
+          <div
+            className="rounded-xl p-3 flex items-center justify-between gap-3 shadow-xs"
+            style={{
+              background: "rgba(30, 215, 96, 0.12)",
+              border: "1px solid rgba(30, 215, 96, 0.35)",
+            }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {nowPlaying.coverUrl ? (
+                <img src={nowPlaying.coverUrl} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0" />
+              ) : (
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-emerald-950 text-emerald-400 shrink-0">
+                  <Disc3 size={20} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Now Playing on your Spotify
+                </div>
+                <div className="text-xs font-semibold truncate text-white">{nowPlaying.title}</div>
+                <div className="text-[11px] truncate opacity-70">{nowPlaying.artist}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                disabled={isSharingNowPlaying}
+                onClick={() => void handleShareNowPlaying()}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-emerald-500 text-black hover:bg-emerald-400 transition-colors shadow-xs inline-flex items-center gap-1"
+              >
+                <Plus size={13} />
+                <span>{isSharingNowPlaying ? "Sharing…" : "Share to Room"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSpotifyDisconnectModal(true)}
+                className="text-xs opacity-40 hover:opacity-100 p-1"
+                title="Disconnect Spotify"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Connect Spotify button (if not connected) */}
+        {!spotifyStatus.isConnected && (
+          <div className="flex items-center justify-between text-xs px-3 py-2 rounded-lg" style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
+            <span className="opacity-80">Listening on Spotify? Sync your live tracks with roommates:</span>
+            <button
+              type="button"
+              onClick={() => void handleConnectSpotify()}
+              className="text-xs font-semibold px-2.5 py-1 rounded-md transition-all hover:scale-105 inline-flex items-center gap-1.5"
+              style={{ background: "#1db954", color: "#000" }}
+            >
+              <Disc3 size={13} />
+              <span>Connect Spotify</span>
+            </button>
+          </div>
+        )}
+
+        {/* Tab switcher: Instant Search vs Paste Link */}
+        <div className="flex gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("search")}
+            className="px-3 py-1 rounded-lg font-medium transition-colors inline-flex items-center gap-1.5"
+            style={{
+              background: activeTab === "search" ? "var(--color-primary)" : "var(--color-surface2)",
+              color: activeTab === "search" ? "var(--color-primary-fg)" : "var(--color-muted)",
+            }}
+          >
+            <Search size={12} />
+            <span>Instant Search</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("paste")}
+            className="px-3 py-1 rounded-lg font-medium transition-colors inline-flex items-center gap-1.5"
+            style={{
+              background: activeTab === "paste" ? "var(--color-primary)" : "var(--color-surface2)",
+              color: activeTab === "paste" ? "var(--color-primary-fg)" : "var(--color-muted)",
+            }}
+          >
+            <Link2 size={12} />
+            <span>Paste Link</span>
+          </button>
+        </div>
+
+        {/* Instant Search Bar */}
+        {activeTab === "search" && (
+          <div className="relative">
+            <div className="absolute left-3 top-2.5 text-[var(--color-muted)]">
+              <Search size={14} />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search any song or artist (e.g. Midnight City, Daft Punk, Lofi)..."
+              className="w-full rounded-lg pl-8 pr-8 py-2 text-sm outline-none focus:ring-1"
+              style={{
+                background: "var(--color-surface2)",
+                color: "var(--color-fg)",
+                border: "1px solid var(--color-border)",
+              }}
+            />
+            {isSearching && (
+              <span className="absolute right-3 top-2.5 text-xs animate-spin opacity-60">
+                <Disc3 size={14} />
+              </span>
+            )}
+
+            {/* Instant Search Results Dropdown */}
+            {searchResults.length > 0 && (
+              <div
+                className="absolute z-30 left-0 right-0 top-full mt-1.5 max-h-64 overflow-y-auto rounded-xl p-1.5 shadow-2xl border space-y-1"
+                style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
+              >
+                {searchResults.map((track) => (
+                  <div
+                    key={track.id}
+                    className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-neutral-800/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {track.coverUrl ? (
+                        <img src={track.coverUrl} alt="" className="h-9 w-9 rounded-md object-cover shrink-0" />
+                      ) : (
+                        <div className="h-9 w-9 rounded-md flex items-center justify-center bg-neutral-800 text-xs shrink-0">
+                          <Disc3 size={14} className="text-neutral-400" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold truncate text-white">{track.title}</div>
+                        <div className="text-[11px] truncate opacity-70" style={{ color: "var(--color-muted)" }}>
+                          {track.artist} {track.album && `· ${track.album}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={addingTrackId === track.id}
+                      onClick={() => void handleAddSearchResult(track)}
+                      className="text-xs font-semibold px-3 py-1 rounded-md transition-opacity hover:opacity-80 shrink-0 inline-flex items-center gap-1"
+                      style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+                    >
+                      <Plus size={12} />
+                      <span>{addingTrackId === track.id ? "Adding…" : "Add"}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Smart Paste Input */}
+        {activeTab === "paste" && (
+          <form onSubmit={(e) => void handleAddPastedSong(e)} className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={pasteUrl}
+                onChange={(e) => void handlePasteUrlChange(e.target.value)}
+                placeholder="Paste Spotify track or YouTube link..."
+                required
+                className="flex-1 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1"
+                style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+              />
+              <button
+                type="submit"
+                disabled={!pasteUrl.trim() || isAddingPasted || isFetchingMeta}
+                className="rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-40 inline-flex items-center gap-1"
+                style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+              >
+                <Plus size={12} />
+                <span>{isAddingPasted ? "Adding…" : "Add Song"}</span>
+              </button>
+            </div>
+
+            {isFetchingMeta && <div className="text-[11px] italic text-amber-400">Fetching song details…</div>}
+
+            {pastedTitle && (
+              <div className="flex items-center gap-2.5 p-2 rounded-lg text-xs" style={{ background: "var(--color-surface2)" }}>
+                {pastedCover && <img src={pastedCover} alt="" className="h-8 w-8 rounded-md object-cover" />}
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{pastedTitle}</div>
+                  <div className="opacity-70 text-[11px]">{pastedArtist}</div>
+                </div>
+              </div>
+            )}
+          </form>
+        )}
+      </div>
+
+      {/* Playlist Tracks List */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {songs.length === 0 && (
+          <div className="text-center py-12 space-y-2" style={{ color: "var(--color-muted)" }}>
+            <div className="mx-auto h-10 w-10 rounded-full flex items-center justify-center bg-neutral-800/80 text-neutral-400">
+              <Music2 size={18} />
+            </div>
+            <p className="text-sm font-medium">The room playlist is quiet</p>
+            <p className="text-xs">Search a song above or sync your Spotify to start listening together.</p>
+          </div>
+        )}
+
+        {songs.map((song) => (
+          <div
+            key={song.id}
+            className="rounded-xl p-3.5 space-y-2 shadow-xs"
+            style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+          >
+            <div className="flex items-center gap-3">
+              {song.coverUrl ? (
+                <img src={song.coverUrl} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0 shadow-xs" />
+              ) : (
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-neutral-800 text-neutral-400 shrink-0">
+                  <Disc3 size={18} />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate" style={{ color: "var(--color-fg)" }}>
+                  {song.title}
+                </div>
+                <div className="text-xs" style={{ color: "var(--color-muted)" }}>
+                  {song.artist} · added by <span className="font-medium text-amber-500">{song.identity}</span>
+                </div>
+              </div>
+              <a
+                href={song.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-2.5 py-1.5 rounded-md font-medium hover:opacity-80 shrink-0 inline-flex items-center gap-1"
+                style={{ background: "var(--color-surface2)", color: "var(--color-primary)", border: "1px solid var(--color-border)" }}
+              >
+                <span>External</span>
+                <ExternalLink size={11} />
+              </a>
+            </div>
+
+            {/* Embedded Spotify / YouTube Player */}
+            <MediaEmbed url={song.url} title={song.title} />
+          </div>
+        ))}
+      </div>
+
+      {/* Spotify Setup Guide Modal */}
+      <SpotifySetupModal
+        isOpen={showSpotifySetupModal}
+        onClose={() => setShowSpotifySetupModal(false)}
+      />
+
+      {/* Spotify Disconnect Confirmation Modal */}
+      <SpotifyDisconnectModal
+        isOpen={showSpotifyDisconnectModal}
+        onClose={() => setShowSpotifyDisconnectModal(false)}
+        onConfirm={() => void handleConfirmDisconnectSpotify()}
+        isSubmitting={isDisconnectingSpotify}
+      />
+    </div>
+  );
+}
+
+// ─── Daily Question Tab ───────────────────────────────────────────────────────
+
+function DailyTab({ roomId }: { roomId: string }) {
+  const [question, setQuestion] = useState<DailyQuestionView | null | "loading">("loading");
+  const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function load() {
+    const q = await getDailyQuestion({ data: { roomId } });
+    setQuestion(q);
+    if (q?.myAnswer) setAnswer(q.myAnswer);
+  }
+
+  useEffect(() => {
+    void load();
+  }, [roomId]);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!answer.trim() || submitting || !question || question === "loading") return;
+    setSubmitting(true);
+    sound.playPop();
+    try {
+      await submitDailyAnswer({
+        data: { roomId, dayIndex: question.dayIndex, questionId: question.questionId, body: answer.trim() },
+      });
+      await load();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (question === "loading") {
+    return (
+      <div className="grid h-full place-items-center">
+        <span className="text-sm" style={{ color: "var(--color-muted)" }}>Loading question…</span>
+      </div>
+    );
+  }
+  if (!question) {
+    return (
+      <div className="grid h-full place-items-center">
+        <p className="text-sm text-center px-4" style={{ color: "var(--color-muted)" }}>
+          Daily questions unlock once the room starts.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col overflow-y-auto px-4 py-4 space-y-4">
+      <div className="rounded-xl p-4 space-y-1.5" style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
+        <div className="text-xs font-semibold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+          <Sparkles size={13} />
+          <span>{question.dayLabel} Prompt</span>
+        </div>
+        <h2 className="text-base font-semibold leading-snug" style={{ color: "var(--color-fg)" }}>
+          {question.prompt}
+        </h2>
+      </div>
+
+      {!question.myAnswer ? (
+        <form onSubmit={(e) => void submit(e)} className="space-y-2">
+          <textarea
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder="Write your answer to share with roommates…"
+            maxLength={LIMITS.dailyAnswerMax}
+            rows={3}
+            className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none focus:ring-1"
+            style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
+          />
+          <button
+            type="submit"
+            disabled={!answer.trim() || submitting}
+            className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-40 hover:opacity-80"
+            style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+          >
+            {submitting ? "Submitting…" : "Share Answer"}
+          </button>
+        </form>
+      ) : (
+        <div className="rounded-xl p-3.5 space-y-1 text-sm" style={{ background: "rgba(194, 144, 90, 0.1)", border: "1px solid var(--color-primary)", color: "var(--color-fg)" }}>
+          <div className="text-xs font-semibold text-amber-500 flex items-center gap-1">
+            <BadgeCheck size={13} />
+            <span>Your Answer:</span>
+          </div>
+          <p className="leading-relaxed">{question.myAnswer}</p>
+        </div>
+      )}
+
+      {question.answers.length > 0 && (
+        <div className="space-y-2.5 pt-2">
+          <div className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: "var(--color-muted)" }}>
+            <Users size={12} />
+            <span>Roommate Answers ({question.answers.length})</span>
+          </div>
+          {question.answers.map((a, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-3.5 space-y-1.5"
+              style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+            >
+              <div className="flex items-center gap-2">
+                <AnimalAvatar animal={a.animal} color={a.color} size={20} />
+                <span className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>
+                  {a.identity} {a.isMe && "(You)"}
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed pl-7" style={{ color: "var(--color-fg)" }}>
+                {a.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  /* Roomies palette — warm, cosy, slightly dim */
+  --color-bg:        #0e0d0b;
+  --color-surface:   #1a1916;
+  --color-surface2:  #242220;
+  --color-border:    #2e2b28;
+  --color-fg:        #e8e4de;
+  --color-muted:     #8a8278;
+  --color-primary:   #c2905a;
+  --color-primary-fg:#0e0d0b;
+  --color-accent:    #7a9e87;
+  --color-danger:    #c26060;
+
+  --radius:          0.65rem;
+  --radius-sm:       0.4rem;
+  --radius-lg:       1rem;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after { box-sizing: border-box; }
+
+  html { font-family: var(--font-sans); }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    min-height: 100dvh;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) { cursor: pointer; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+}
