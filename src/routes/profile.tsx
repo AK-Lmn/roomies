@@ -144,8 +144,8 @@ function ProfilePage() {
 
       <main className="max-w-sm mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl overflow-hidden border p-0.5 shadow-md shrink-0" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface)" }}>
-            <img src={selectedAvatar.avatarUrl} alt={selectedAvatar.name} className="w-full h-full object-contain" />
+          <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 shadow-md shrink-0 flex items-center justify-center p-1" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface2)" }}>
+            <img src={selectedAvatar.avatarUrl} alt="" className="w-full h-full object-contain rounded-xl" />
           </div>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "var(--color-fg)" }}>Your profile</h1>
@@ -154,12 +154,12 @@ function ProfilePage() {
         </div>
 
         <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
-          {/* Avatar Choices Grid */}
+          {/* Avatar Choices Grid - No text names on icons */}
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: "var(--color-muted)" }}>
               Animal Avatar
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-6 gap-2">
               {ANIMAL_AVATAR_CHOICES.map((choice) => {
                 const isSelected = selectedAvatar.id === choice.id;
                 return (
@@ -167,22 +167,18 @@ function ProfilePage() {
                     key={choice.id}
                     type="button"
                     onClick={() => setSelectedAvatar(choice)}
-                    className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:scale-105 cursor-pointer relative"
+                    title={choice.name}
+                    className="aspect-square rounded-2xl border flex items-center justify-center p-1 transition-all hover:scale-110 cursor-pointer relative"
                     style={{
                       background: isSelected ? "var(--color-surface2)" : "var(--color-surface)",
                       borderColor: isSelected ? choice.color : "var(--color-border)",
-                      boxShadow: isSelected ? `0 0 0 1px ${choice.color}` : "none",
+                      boxShadow: isSelected ? `0 0 0 2px ${choice.color}` : "none",
                     }}
                   >
-                    <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center p-0.5" style={{ background: "var(--color-surface2)" }}>
-                      <img src={choice.avatarUrl} alt={choice.name} className="w-full h-full object-contain" />
-                    </div>
-                    <span className="text-[11px] font-medium truncate w-full text-center" style={{ color: isSelected ? "var(--color-fg)" : "var(--color-muted)" }}>
-                      {choice.name}
-                    </span>
+                    <img src={choice.avatarUrl} alt="" className="w-full h-full object-contain rounded-xl" />
                     {isSelected && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ background: choice.color }}>
-                        <Check size={10} strokeWidth={3} />
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white shadow-xs" style={{ background: choice.color }}>
+                        <Check size={9} strokeWidth={3} />
                       </div>
                     )}
                   </button>
@@ -282,19 +278,20 @@ function ProfilePage() {
               <Globe size={13} />
               <span>Social links (optional)</span>
             </div>
-            {[
-              { label: "Website", value: websiteUrl, set: setWebsiteUrl, Icon: Globe },
-              { label: "Instagram handle", value: instagramUrl, set: setInstagramUrl, Icon: Instagram },
-              { label: "X / Twitter handle", value: xUrl, set: setXUrl, Icon: Twitter },
-            ].map(({ label, value, set }) => (
-              <div key={label}>
+            
+            <div className="space-y-2">
+              {/* Website */}
+              <div className="relative">
+                <div className="absolute left-3 top-2.5 text-neutral-400 pointer-events-none">
+                  <Globe size={15} />
+                </div>
                 <input
                   type="text"
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  placeholder={label}
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="Website URL"
                   maxLength={LIMITS.socialUrlMax}
-                  className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 border"
+                  className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 border"
                   style={{
                     background: "var(--color-surface2)",
                     color: "var(--color-fg)",
@@ -302,7 +299,47 @@ function ProfilePage() {
                   }}
                 />
               </div>
-            ))}
+
+              {/* Instagram */}
+              <div className="relative">
+                <div className="absolute left-3 top-2.5 text-neutral-400 pointer-events-none">
+                  <Instagram size={15} />
+                </div>
+                <input
+                  type="text"
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="Instagram handle"
+                  maxLength={LIMITS.socialUrlMax}
+                  className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 border"
+                  style={{
+                    background: "var(--color-surface2)",
+                    color: "var(--color-fg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
+              </div>
+
+              {/* X / Twitter */}
+              <div className="relative">
+                <div className="absolute left-3 top-2.5 text-neutral-400 pointer-events-none">
+                  <Twitter size={15} />
+                </div>
+                <input
+                  type="text"
+                  value={xUrl}
+                  onChange={(e) => setXUrl(e.target.value)}
+                  placeholder="X / Twitter handle"
+                  maxLength={LIMITS.socialUrlMax}
+                  className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-1 border"
+                  style={{
+                    background: "var(--color-surface2)",
+                    color: "var(--color-fg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2 pt-1">

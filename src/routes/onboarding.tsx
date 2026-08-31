@@ -127,10 +127,10 @@ function OnboardingPage() {
     <main className="min-h-dvh flex items-center justify-center p-4 sm:p-6" style={{ background: "var(--color-bg)" }}>
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-3">
-          <div className="relative mx-auto w-20 h-20 rounded-2xl overflow-hidden border-2 shadow-2xl p-1" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface)" }}>
+          <div className="relative mx-auto w-16 h-16 rounded-2xl overflow-hidden border-2 shadow-2xl p-1" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface2)" }}>
             <img
               src={selectedAvatar.avatarUrl}
-              alt={selectedAvatar.name}
+              alt=""
               className="w-full h-full object-contain rounded-xl"
             />
           </div>
@@ -145,12 +145,12 @@ function OnboardingPage() {
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-          {/* Avatar Choice Grid */}
+          {/* Avatar Choice Grid - No text names */}
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: "var(--color-muted)" }}>
               Choose Animal Avatar
             </label>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-6 gap-2">
               {ANIMAL_AVATAR_CHOICES.map((choice) => {
                 const isSelected = selectedAvatar.id === choice.id;
                 return (
@@ -158,22 +158,18 @@ function OnboardingPage() {
                     key={choice.id}
                     type="button"
                     onClick={() => setSelectedAvatar(choice)}
-                    className="flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all hover:scale-105 cursor-pointer relative"
+                    title={choice.name}
+                    className="aspect-square rounded-2xl border flex items-center justify-center p-1 transition-all hover:scale-110 cursor-pointer relative"
                     style={{
                       background: isSelected ? "var(--color-surface2)" : "var(--color-surface)",
                       borderColor: isSelected ? choice.color : "var(--color-border)",
-                      boxShadow: isSelected ? `0 0 0 1px ${choice.color}` : "none",
+                      boxShadow: isSelected ? `0 0 0 2px ${choice.color}` : "none",
                     }}
                   >
-                    <div className="w-11 h-11 rounded-lg overflow-hidden flex items-center justify-center p-0.5" style={{ background: "var(--color-surface2)" }}>
-                      <img src={choice.avatarUrl} alt={choice.name} className="w-full h-full object-contain" />
-                    </div>
-                    <span className="text-[11px] font-medium truncate w-full text-center" style={{ color: isSelected ? "var(--color-fg)" : "var(--color-muted)" }}>
-                      {choice.name}
-                    </span>
+                    <img src={choice.avatarUrl} alt="" className="w-full h-full object-contain rounded-xl" />
                     {isSelected && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ background: choice.color }}>
-                        <Check size={10} strokeWidth={3} />
+                      <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white shadow-xs" style={{ background: choice.color }}>
+                        <Check size={9} strokeWidth={3} />
                       </div>
                     )}
                   </button>
