@@ -14,16 +14,23 @@ function MatchPage() {
   const [status, setStatus] = useState<"idle" | "matching" | "matched" | "error">("idle");
   const [waitMs, setWaitMs] = useState(0);
   const [error, setError] = useState("");
-  const [activeUsers, setActiveUsers] = useState<number>(67);
+  const [activeUsers, setActiveUsers] = useState<number>(1);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAt = useRef<number>(Date.now());
 
   useEffect(() => {
-    getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
-    const interval = setInterval(() => {
+    const updateCount = () => {
       getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
-    }, 20_000);
-    return () => clearInterval(interval);
+    };
+    updateCount();
+    const interval = setInterval(updateCount, 8_000);
+    window.addEventListener("focus", updateCount);
+    document.addEventListener("visibilitychange", updateCount);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", updateCount);
+      document.removeEventListener("visibilitychange", updateCount);
+    };
   }, []);
 
   function stopPolling() {

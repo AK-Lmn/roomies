@@ -15,15 +15,22 @@ function HomePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [activeUsers, setActiveUsers] = useState<number>(67);
+  const [activeUsers, setActiveUsers] = useState<number>(1);
 
   const userId = user?.id;
   useEffect(() => {
-    getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
-    const interval = setInterval(() => {
+    const updateCount = () => {
       getActiveOnlineCount().then((res) => setActiveUsers(res.activeCount)).catch(() => {});
-    }, 20_000);
-    return () => clearInterval(interval);
+    };
+    updateCount();
+    const interval = setInterval(updateCount, 10_000);
+    window.addEventListener("focus", updateCount);
+    document.addEventListener("visibilitychange", updateCount);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", updateCount);
+      document.removeEventListener("visibilitychange", updateCount);
+    };
   }, []);
 
   useEffect(() => {
