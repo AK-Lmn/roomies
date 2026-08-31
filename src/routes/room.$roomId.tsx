@@ -2,7 +2,8 @@ import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router"
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { getRoom, pingPresence, revealIdentity, leaveRoom } from "@/lib/server/rooms";
-import { getMessages, sendMessage } from "@/lib/server/messages";
+import { getMessages, sendMessage, toggleMessageReaction } from "@/lib/server/messages";
+import { AppleEmoji, DEFAULT_REACTIONS, EmojiPickerModal } from "@/components/apple-emoji";
 import {
   getWallPosts,
   createWallPost,
@@ -452,6 +453,7 @@ function ChatTab({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   async function loadMessages() {
@@ -485,6 +487,38 @@ function ChatTab({
     return members.find((m) => m.userId === userId);
   }
 
+  async function handleToggleReaction(messageId: string, emoji: string) {
+    sound.playPop();
+    try {
+      const res = await toggleMessageReaction({ data: { messageId, emoji } });
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const existing = msg.reactions?.find((r) => r.emoji === emoji);
+          let newReactions = [...(msg.reactions ?? [])];
+          if (res.added) {
+            if (existing) {
+              newReactions = newReactions.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count + 1, mine: true } : r
+              );
+            } else {
+              newReactions.push({ emoji, count: 1, mine: true });
+            }
+          } else {
+            if (existing && existing.count > 1) {
+              newReactions = newReactions.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count - 1, mine: false } : r
+              );
+            } else {
+              newReactions = newReactions.filter((r) => r.emoji !== emoji);
+            }
+          }
+          return { ...msg, reactions: newReactions };
+        })
+      );
+    } catch {}
+  }
+
   async function handleSend(e?: FormEvent) {
     e?.preventDefault();
     const text = body.trim();
@@ -508,6 +542,7 @@ function ChatTab({
         color: meMember?.identityColor ?? "#c2905a",
         revealedName: meMember?.revealed && meMember.profile?.displayName ? meMember.profile.displayName : null,
         isMe: true,
+        reactions: [],
       };
       setMessages((prev) => [...prev, localMsg]);
       p2p.broadcastChat({ ...localMsg, isMe: false });
@@ -535,7 +570,7 @@ function ChatTab({
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <div className="w-full max-w-3xl mx-auto space-y-3">
+        <div className="w-full max-w-3xl mx-auto space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-16 space-y-2" style={{ color: "var(--color-muted)" }}>
               <div className="mx-auto h-12 w-12 rounded-full flex items-center justify-center bg-neutral-800/80 text-neutral-400">
@@ -551,7 +586,7 @@ function ChatTab({
             const authorAnimal = member?.identityAnimal ?? msg.animal ?? "Fox";
 
             return (
-              <div key={msg.id} className={`flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
+              <div key={msg.id} className={`group relative flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}>
                 <AnimalAvatar
                   animal={authorAnimal}
                   color={authorColor}
@@ -560,20 +595,78 @@ function ChatTab({
                   displayName={msg.revealedName}
                   className="mt-0.5"
                 />
-                <div className={`max-w-[80%] sm:max-w-[70%] space-y-0.5 ${msg.isMe ? "items-end" : "items-start"} flex flex-col`}>
+                <div className={`max-w-[85%] sm:max-w-[75%] space-y-1 ${msg.isMe ? "items-end" : "items-start"} flex flex-col`}>
                   <div className="text-[10px]" style={{ color: "var(--color-muted)" }}>
                     {msg.revealedName ? `${msg.revealedName} (${msg.identity})` : msg.identity} · {clockTime(msg.createdAt)}
                   </div>
-                  <div
-                    className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-xs"
-                    style={{
-                      background: msg.isMe ? "var(--color-primary)" : "var(--color-surface2)",
-                      color: msg.isMe ? "var(--color-primary-fg)" : "var(--color-fg)",
-                      border: msg.isMe ? "none" : "1px solid var(--color-border)",
-                    }}
-                  >
-                    {msg.body}
+                  <div className="relative group/bubble flex items-center gap-1.5">
+                    <div
+                      className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-xs"
+                      style={{
+                        background: msg.isMe ? "var(--color-primary)" : "var(--color-surface2)",
+                        color: msg.isMe ? "var(--color-primary-fg)" : "var(--color-fg)",
+                        border: msg.isMe ? "none" : "1px solid var(--color-border)",
+                      }}
+                    >
+                      {msg.body}
+                    </div>
+
+                    {/* Floating Reaction Bar (Default iOS Emojis + Plus) */}
+                    <div className={`absolute -top-4 ${msg.isMe ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"} opacity-0 group-hover/bubble:opacity-100 focus-within:opacity-100 transition-all z-10`}>
+                      <div className="flex items-center gap-1 bg-neutral-900/95 border border-neutral-700/80 rounded-full px-2 py-1 shadow-lg backdrop-blur-md">
+                        {DEFAULT_REACTIONS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => void handleToggleReaction(msg.id, emoji)}
+                            className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer"
+                            title={`React ${emoji}`}
+                          >
+                            <AppleEmoji emoji={emoji} size={15} />
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setPickerMessageId(msg.id)}
+                          className="p-1 rounded-full hover:bg-neutral-800 hover:scale-125 transition-all cursor-pointer text-neutral-400 hover:text-amber-400"
+                          title="More emojis (+)"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mobile / Tap Quick Plus Button */}
+                    <button
+                      type="button"
+                      onClick={() => setPickerMessageId(msg.id)}
+                      className="p-1 rounded-full opacity-40 hover:opacity-100 text-neutral-400 hover:text-amber-400 transition-all cursor-pointer shrink-0"
+                      title="React to message"
+                    >
+                      <Plus size={13} />
+                    </button>
                   </div>
+
+                  {/* Active Reactions Pills */}
+                  {msg.reactions && msg.reactions.length > 0 && (
+                    <div className="flex gap-1 flex-wrap pt-0.5">
+                      {msg.reactions.map((r) => (
+                        <button
+                          key={r.emoji}
+                          type="button"
+                          onClick={() => void handleToggleReaction(msg.id, r.emoji)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all cursor-pointer ${
+                            r.mine
+                              ? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-xs scale-105"
+                              : "bg-neutral-800/80 border-neutral-700/60 text-neutral-300 hover:bg-neutral-800"
+                          }`}
+                        >
+                          <AppleEmoji emoji={r.emoji} size={13} />
+                          <span>{r.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -581,6 +674,16 @@ function ChatTab({
           <div ref={bottomRef} />
         </div>
       </div>
+
+      <EmojiPickerModal
+        isOpen={Boolean(pickerMessageId)}
+        onClose={() => setPickerMessageId(null)}
+        onSelectEmoji={(emoji) => {
+          if (pickerMessageId) {
+            void handleToggleReaction(pickerMessageId, emoji);
+          }
+        }}
+      />
 
       {p2p.typingUsers.length > 0 && (
         <div className="w-full max-w-3xl mx-auto px-4 py-1 text-[11px] italic flex items-center gap-2" style={{ color: "var(--color-muted)" }}>

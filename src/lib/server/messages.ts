@@ -69,6 +69,26 @@ export const getMessages = createServerFn({ method: "GET" })
       params,
     );
 
+    if (rows.length === 0) return [];
+
+    const msgIds = rows.map((r) => r.id);
+    const reactions = await sql.query<{ message_id: string; emoji: string; count: number; mine: boolean }>(
+      `select mr.message_id, mr.emoji,
+              count(*)::int as count,
+              bool_or(mr.user_id = $1) as mine
+       from message_reactions mr
+       where mr.message_id = any($2::text[])
+       group by mr.message_id, mr.emoji`,
+      [userId, msgIds],
+    );
+
+    const reactionsByMsg = new Map<string, Array<{ emoji: string; count: number; mine: boolean }>>();
+    for (const r of reactions) {
+      const list = reactionsByMsg.get(r.message_id) ?? [];
+      list.push({ emoji: r.emoji, count: r.count, mine: r.mine });
+      reactionsByMsg.set(r.message_id, list);
+    }
+
     return rows.map((r) => ({
       id: r.id,
       roomId: r.room_id,
@@ -80,5 +100,47 @@ export const getMessages = createServerFn({ method: "GET" })
       color: r.identity_color,
       revealedName: r.revealed && r.display_name ? r.display_name : null,
       isMe: r.user_id === userId,
+      reactions: reactionsByMsg.get(r.id) ?? [],
     }));
+  });
+
+export const toggleMessageReaction = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({
+    messageId: z.string(),
+    emoji: z.string().min(1).max(20),
+  }))
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const userId = context.userId;
+
+    const msgs = await sql<{ room_id: string }>`
+      select room_id from messages where id = ${data.messageId}
+    `;
+    if (!msgs.length) throw new Error("Message not found");
+
+    const roomId = msgs[0].room_id;
+    const membership = await sql<{ room_id: string }>`
+      select room_id from room_members where room_id = ${roomId} and user_id = ${userId}
+    `;
+    if (!membership.length) throw new Error("Not a member");
+
+    const existing = await sql<{ message_id: string }>`
+      select message_id from message_reactions
+      where message_id = ${data.messageId} and user_id = ${userId} and emoji = ${data.emoji}
+    `;
+
+    if (existing.length > 0) {
+      await sql`
+        delete from message_reactions
+        where message_id = ${data.messageId} and user_id = ${userId} and emoji = ${data.emoji}
+      `;
+      return { added: false, messageId: data.messageId, emoji: data.emoji };
+    } else {
+      await sql`
+        insert into message_reactions (message_id, user_id, emoji)
+        values (${data.messageId}, ${userId}, ${data.emoji})
+      `;
+      return { added: true, messageId: data.messageId, emoji: data.emoji };
+    }
   });

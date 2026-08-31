@@ -60,6 +60,12 @@ export type RoomView = RoomSummary & {
   myRevealed: boolean;
 };
 
+export type MessageReaction = {
+  emoji: string;
+  count: number;
+  mine: boolean;
+};
+
 export type ChatMessage = {
   id: string;
   roomId: string;
@@ -71,6 +77,7 @@ export type ChatMessage = {
   color: string;
   revealedName: string | null;
   isMe: boolean;
+  reactions: MessageReaction[];
 };
 
 export type WallPost = {
