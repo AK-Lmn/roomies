@@ -77,7 +77,7 @@ export const createWallPost = createServerFn({ method: "POST" })
   .validator(z.object({
     roomId: z.string(),
     body: z.string().min(1).max(LIMITS.wallPostMax),
-    imageUrl: z.string().url().nullable().default(null),
+    imageUrl: z.string().max(600_000).nullable().default(null),
   }))
   .handler(async ({ context, data }) => {
     const sql = await getSql();

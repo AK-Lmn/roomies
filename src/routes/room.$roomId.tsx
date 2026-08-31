@@ -36,6 +36,9 @@ import type { RoomView, ChatMessage, WallPost, FridgeNote, Song, DailyQuestionVi
 import { RoommateModal } from "@/components/modals/roommate-modal";
 import { RevealIdentityModal } from "@/components/modals/reveal-identity-modal";
 import { SpotifySetupModal, SpotifyDisconnectModal } from "@/components/modals/spotify-modals";
+import { ImageLightbox } from "@/components/image-lightbox";
+import { compressImage } from "@/lib/image-compress";
+import { sendBackgroundNotification, requestNotificationPermission } from "@/lib/notifications";
 import {
   Volume2,
   VolumeX,
@@ -59,6 +62,7 @@ import {
   Radio,
   Plus,
   ArrowLeft,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export const Route = createFileRoute("/room/$roomId")({ component: RoomPage });
@@ -80,6 +84,13 @@ function RoomPage() {
   const [room, setRoom] = useState<RoomView | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("chat");
+  const [unreadTabs, setUnreadTabs] = useState<Record<Tab, boolean>>({
+    chat: false,
+    wall: false,
+    fridge: false,
+    music: false,
+    daily: false,
+  });
   const [muted, setMuted] = useState(sound.isMuted());
   const [revealing, setRevealing] = useState(false);
   const [showRevealModal, setShowRevealModal] = useState(false);
@@ -92,18 +103,35 @@ function RoomPage() {
 
   const me = room?.members.find((m) => m.isMe);
 
+  const handleSelectTab = (selectedTab: Tab) => {
+    setTab(selectedTab);
+    setUnreadTabs((prev) => ({ ...prev, [selectedTab]: false }));
+  };
+
   const p2p = useP2PRoom({
     roomId,
     userId: user?.id ?? "",
     name: me?.tempIdentity ?? "Roomie",
     onChatMessage: (msg) => {
       sound.playChime();
+      if (tab !== "chat") {
+        setUnreadTabs((prev) => ({ ...prev, chat: true }));
+      }
+      sendBackgroundNotification(`Roomies · ${msg.identity}`, msg.body);
       onIncomingChatRef.current?.(msg);
     },
     onReaction: (postId, kind) => {
+      if (tab !== "wall") {
+        setUnreadTabs((prev) => ({ ...prev, wall: true }));
+      }
+      sendBackgroundNotification("Roomies · Wall", "A roommate reacted to a post");
       onIncomingReactionRef.current?.(postId, kind);
     },
     onNoteAdded: () => {
+      if (tab !== "fridge") {
+        setUnreadTabs((prev) => ({ ...prev, fridge: true }));
+      }
+      sendBackgroundNotification("Roomies · Fridge", "A new sticky note was posted");
       onIncomingNoteRef.current?.();
     },
   });
@@ -126,6 +154,7 @@ function RoomPage() {
   useEffect(() => {
     if (!user) return;
     void refreshRoom();
+    void requestNotificationPermission();
     const presencePing = setInterval(() => void pingPresence({ data: { roomId } }).catch(() => {}), 30_000);
     const roomRefresh = setInterval(() => void refreshRoom(), 15_000);
     return () => {
@@ -252,8 +281,8 @@ function RoomPage() {
         {TABS.map(({ id: t, label, Icon }) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
-            className="flex-1 min-w-0 py-2.5 px-3 inline-flex items-center justify-center gap-1.5 text-xs font-medium transition-colors"
+            onClick={() => handleSelectTab(t)}
+            className="flex-1 min-w-0 py-2.5 px-3 inline-flex items-center justify-center gap-1.5 text-xs font-medium transition-colors relative"
             style={{
               color: tab === t ? "var(--color-primary)" : "var(--color-muted)",
               borderBottom: tab === t ? "2px solid var(--color-primary)" : "2px solid transparent",
@@ -261,6 +290,9 @@ function RoomPage() {
           >
             <Icon size={13} />
             <span>{label}</span>
+            {unreadTabs[t] && tab !== t && (
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" title="New activity" />
+            )}
           </button>
         ))}
       </nav>
@@ -533,7 +565,11 @@ function WallTab({
 }) {
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [body, setBody] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const p = await getWallPosts({ data: { roomId } });
@@ -556,15 +592,38 @@ function WallTab({
     };
   }, [onIncomingReactionRef]);
 
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsCompressing(true);
+    try {
+      const dataUrl = await compressImage(file, 1200, 0.8);
+      setImagePreview(dataUrl);
+    } catch {
+      // ignore
+    } finally {
+      setIsCompressing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function handleRemoveImage() {
+    setImagePreview(null);
+  }
+
   async function post(e: FormEvent) {
     e.preventDefault();
-    if (!body.trim() || posting) return;
+    if ((!body.trim() && !imagePreview) || posting || isCompressing) return;
     setPosting(true);
     sound.playPop();
-    await createWallPost({ data: { roomId, body: body.trim(), imageUrl: null } });
-    setBody("");
-    await load();
-    setPosting(false);
+    try {
+      await createWallPost({ data: { roomId, body: body.trim(), imageUrl: imagePreview } });
+      setBody("");
+      setImagePreview(null);
+      await load();
+    } finally {
+      setPosting(false);
+    }
   }
 
   async function react(postId: string, kind: string) {
@@ -584,13 +643,13 @@ function WallTab({
                 <LayoutGrid size={20} />
               </div>
               <p className="text-sm font-medium">The wall is blank</p>
-              <p className="text-xs">Post thoughts, jokes, or stories for your roommates to see.</p>
+              <p className="text-xs">Post thoughts, photos, jokes, or stories for your roommates to see.</p>
             </div>
           )}
           {posts.map((postItem) => (
             <div
               key={postItem.id}
-              className="rounded-2xl p-4 sm:p-5 space-y-2.5 shadow-xs border transition-all"
+              className="rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs border transition-all"
               style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
             >
               <div className="flex items-center gap-2.5">
@@ -605,9 +664,25 @@ function WallTab({
                   {postItem.revealedName ? `${postItem.revealedName} (${postItem.identity})` : postItem.identity} · {timeAgo(postItem.createdAt)}
                 </span>
               </div>
-              <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap" style={{ color: "var(--color-fg)" }}>
-                {postItem.body}
-              </p>
+
+              {postItem.body && (
+                <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap" style={{ color: "var(--color-fg)" }}>
+                  {postItem.body}
+                </p>
+              )}
+
+              {postItem.imageUrl && (
+                <div className="pt-1">
+                  <img
+                    src={postItem.imageUrl}
+                    alt="Wall attachment"
+                    onClick={() => setLightboxSrc(postItem.imageUrl)}
+                    className="max-h-80 w-auto max-w-full rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity border"
+                    style={{ borderColor: "var(--color-border)" }}
+                  />
+                </div>
+              )}
+
               <div className="flex gap-1.5 flex-wrap pt-1">
                 {REACTION_TYPES.map(({ kind }) => {
                   const existing = postItem.reactions.find((x) => x.kind === kind);
@@ -627,28 +702,70 @@ function WallTab({
         </div>
       </div>
 
-      <div className="flex-none px-4 py-2.5 border-t" style={{ borderColor: "var(--color-border)" }}>
-        <form onSubmit={(e) => void post(e)} className="w-full max-w-3xl mx-auto flex gap-2">
+      <div className="flex-none px-4 py-2.5 border-t space-y-2" style={{ borderColor: "var(--color-border)" }}>
+        {imagePreview && (
+          <div className="w-full max-w-3xl mx-auto flex items-center gap-3 p-2 rounded-xl border" style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}>
+            <img src={imagePreview} alt="Preview" className="h-12 w-12 rounded-lg object-cover border border-neutral-700" />
+            <div className="flex-1 text-xs truncate" style={{ color: "var(--color-fg)" }}>
+              Photo attached
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="p-1 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+              title="Remove image"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={(e) => void post(e)} className="w-full max-w-3xl mx-auto flex items-end gap-2">
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isCompressing || posting}
+            className="p-2.5 rounded-xl border text-[var(--color-muted)] hover:text-[var(--color-fg)] hover:bg-neutral-800 transition-all shrink-0"
+            style={{ background: "var(--color-surface2)", borderColor: "var(--color-border)" }}
+            title="Attach a photo"
+          >
+            <ImageIcon size={16} />
+          </button>
+
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Post something to the room wall…"
+            placeholder="Post something or attach a photo…"
             maxLength={LIMITS.wallPostMax}
-            rows={2}
+            rows={1}
             className="flex-1 resize-none rounded-xl px-3.5 py-2 text-sm outline-none focus:ring-1 transition-all"
             style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }}
           />
+
           <button
             type="submit"
-            disabled={!body.trim() || posting}
+            disabled={(!body.trim() && !imagePreview) || posting || isCompressing}
             className="rounded-xl px-5 py-2 text-sm font-semibold disabled:opacity-40 hover:opacity-80 inline-flex items-center gap-1.5 shrink-0 shadow-xs"
             style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
           >
             <Plus size={15} />
-            <span>Post</span>
+            <span>{posting ? "Posting…" : "Post"}</span>
           </button>
         </form>
       </div>
+
+      <ImageLightbox
+        src={lightboxSrc}
+        onClose={() => setLightboxSrc(null)}
+      />
     </div>
   );
 }
