@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal } from "@/components/ui/modal";
-import { Disc3, Unlink, KeyRound, Search, CheckCircle2 } from "lucide-react";
+import { Disc3, Unlink, CheckCircle2, Music2 } from "lucide-react";
 
 interface SpotifySetupModalProps {
   isOpen: boolean;
@@ -12,55 +12,39 @@ export function SpotifySetupModal({ isOpen, onClose }: SpotifySetupModalProps) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Connect Spotify Account"
-      subtitle="Sync your live Spotify playback with roommates"
+      title="Music Player & Search"
+      subtitle="Listen and share music with your roommates"
       icon={<Disc3 size={20} className="text-emerald-400" />}
       iconBg="rgba(30, 215, 96, 0.15)"
       footer={
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 rounded-xl text-xs font-semibold hover:opacity-90"
+          className="px-5 py-2 rounded-xl text-xs font-semibold hover:opacity-90 cursor-pointer shadow-xs"
           style={{
             background: "var(--color-primary)",
             color: "var(--color-primary-fg)",
           }}
         >
-          Got it
+          Start Listening
         </button>
       }
     >
       <div className="space-y-3.5 text-xs">
         <div
-          className="rounded-xl p-3 space-y-1.5 border"
+          className="rounded-2xl p-4 space-y-2 border shadow-xs"
           style={{
             background: "rgba(30, 215, 96, 0.08)",
             borderColor: "rgba(30, 215, 96, 0.25)",
           }}
         >
-          <div className="flex items-center gap-2 font-medium text-emerald-400">
-            <Search size={14} />
-            <span>Instant Search is already active!</span>
+          <div className="flex items-center gap-2 font-semibold text-emerald-400 text-sm">
+            <CheckCircle2 size={16} />
+            <span>Music Search & 30s Previews Ready!</span>
           </div>
-          <p className="opacity-80 leading-relaxed">
-            You can already search any track or paste links in the Music tab with zero setup.
+          <p className="opacity-90 leading-relaxed text-xs">
+            You can search any song or artist in the Music tab, tap album covers to play 30-second audio previews, and share tracks instantly with your roommates.
           </p>
-        </div>
-
-        <p className="opacity-90 leading-relaxed">
-          To enable live <strong>"Now Playing"</strong> background sync from your real Spotify app, add your Spotify Developer keys to your <code>.env</code> file:
-        </p>
-
-        <div
-          className="rounded-xl p-3 font-mono text-[11px] space-y-1 border"
-          style={{
-            background: "var(--color-surface2)",
-            borderColor: "var(--color-border)",
-          }}
-        >
-          <div className="text-neutral-400"># In your .env file:</div>
-          <div className="text-amber-300">SPOTIFY_CLIENT_ID=&quot;your_id&quot;</div>
-          <div className="text-amber-300">SPOTIFY_CLIENT_SECRET=&quot;your_secret&quot;</div>
         </div>
       </div>
     </Modal>
@@ -84,39 +68,33 @@ export function SpotifyDisconnectModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Disconnect Spotify?"
-      subtitle="Remove Spotify account link from Roomies"
+      title="Disconnect Spotify"
+      subtitle="Are you sure you want to disconnect Spotify?"
       icon={<Unlink size={20} className="text-rose-400" />}
       iconBg="rgba(244, 63, 94, 0.15)"
       footer={
-        <>
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            disabled={isSubmitting}
             onClick={onClose}
-            className="px-3.5 py-2 rounded-xl text-xs font-medium transition-colors hover:bg-neutral-800 border"
-            style={{
-              color: "var(--color-muted)",
-              borderColor: "var(--color-border)",
-              background: "var(--color-surface2)",
-            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold border hover:bg-neutral-800 transition-colors"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-fg)" }}
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={isSubmitting}
             onClick={onConfirm}
-            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5 shadow-xs bg-rose-600 hover:bg-rose-500 text-white"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 transition-colors shadow-xs"
           >
-            <Unlink size={13} />
-            <span>{isSubmitting ? "Disconnecting…" : "Disconnect"}</span>
+            {isSubmitting ? "Disconnecting…" : "Disconnect"}
           </button>
-        </>
+        </div>
       }
     >
-      <p className="text-xs text-[var(--color-fg)] opacity-90 leading-relaxed">
-        This will disconnect your Spotify account. Your live *"Now Playing"* track will no longer be shared in room sessions. You can reconnect at any time.
+      <p className="text-xs leading-relaxed opacity-80">
+        Disconnecting will stop syncing your live Spotify playing activity with your roommates.
       </p>
     </Modal>
   );
