@@ -6,12 +6,38 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { LIMITS, USERNAME_RE, normalizeUsername } from "@/lib/limits";
 import type { Profile } from "@/lib/types";
 
+let profileColumnsEnsured = false;
+async function ensureProfileColumns(sql: any) {
+  if (profileColumnsEnsured) return;
+  try {
+    await sql`
+      create table if not exists profiles (
+        user_id text primary key,
+        username text unique not null,
+        display_name text not null,
+        bio text,
+        avatar_url text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+    `;
+    await sql`alter table profiles add column if not exists website_url text;`;
+    await sql`alter table profiles add column if not exists instagram_url text;`;
+    await sql`alter table profiles add column if not exists x_url text;`;
+    await sql`alter table profiles add column if not exists show_bio boolean default true;`;
+    await sql`alter table profiles add column if not exists show_social boolean default true;`;
+    await sql`alter table profiles add column if not exists show_joined boolean default true;`;
+    profileColumnsEnsured = true;
+  } catch {}
+}
+
 // ─── read ──────────────────────────────────────────────────────────────────
 
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<Profile | null> => {
     const sql = await getSql();
+    await ensureProfileColumns(sql);
     const rows = await sql<{
       user_id: string;
       username: string;

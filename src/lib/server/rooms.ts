@@ -11,12 +11,59 @@ function genId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+let roomTablesEnsured = false;
+async function ensureRoomTables(sql: any) {
+  if (roomTablesEnsured) return;
+  try {
+    await sql`
+      create table if not exists profiles (
+        user_id text primary key,
+        username text unique not null,
+        display_name text not null,
+        bio text,
+        avatar_url text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+    `;
+    await sql`
+      create table if not exists rooms (
+        id text primary key,
+        name text not null,
+        status text not null default 'waiting',
+        created_at timestamptz not null default now(),
+        expires_at timestamptz not null
+      );
+    `;
+    await sql`
+      create table if not exists room_members (
+        room_id text not null references rooms(id) on delete cascade,
+        user_id text not null,
+        temp_identity text not null,
+        identity_animal text not null,
+        identity_color text not null,
+        revealed boolean not null default false,
+        joined_at timestamptz not null default now(),
+        primary key (room_id, user_id)
+      );
+    `;
+    await sql`
+      create table if not exists matching_queue (
+        user_id text primary key,
+        joined_at timestamptz not null default now()
+      );
+    `;
+    roomTablesEnsured = true;
+  } catch {}
+}
+
 // ─── join matching queue ────────────────────────────────────────────────────
 
 export const joinQueue = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<MatchResult> => {
     const sql = await getSql();
+    await ensureRoomTables(sql);
     const userId = context.userId;
 
     // Must have a profile
@@ -136,6 +183,7 @@ export const getRoom = createServerFn({ method: "GET" })
   .validator(z.object({ roomId: z.string() }))
   .handler(async ({ context, data }): Promise<RoomView | null> => {
     const sql = await getSql();
+    await ensureRoomTables(sql);
     const userId = context.userId;
 
     const rooms = await sql<{

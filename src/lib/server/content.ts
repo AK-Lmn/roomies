@@ -46,17 +46,17 @@ export const getWallPosts = createServerFn({ method: "GET" })
 
     // Fetch reactions separately
     const postIds = posts.map((p) => p.id);
-    const reactions = await sql.query<{ post_id: string; kind: string; count: number; mine: boolean }>(
-      `select pr.post_id, pr.kind,
-              count(*)::int as count,
-              bool_or(pr.user_id = $1) as mine
-       from post_reactions pr
-       where pr.post_id = any($2::text[])
-       group by pr.post_id, pr.kind`,
-      [context.userId, postIds],
-    );
-
     const reactionsByPost = new Map<string, Array<{ kind: string; count: number; mine: boolean }>>();
+
+    const reactions = await sql<{ post_id: string; kind: string; count: number; mine: boolean }>`
+      select post_id, kind,
+             count(*)::int as count,
+             bool_or(user_id = ${context.userId}) as mine
+      from post_reactions
+      where post_id = any(${postIds})
+      group by post_id, kind
+    `;
+
     for (const r of reactions) {
       if (!reactionsByPost.has(r.post_id)) reactionsByPost.set(r.post_id, []);
       reactionsByPost.get(r.post_id)!.push({ kind: r.kind, count: r.count, mine: r.mine });
