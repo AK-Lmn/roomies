@@ -25,8 +25,8 @@ export const Route = createFileRoute("/api/spotify/callback")({
           return new Response("Invalid state parameter", { status: 400 });
         }
 
-        const clientId = process.env.SPOTIFY_CLIENT_ID || "";
-        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || "";
+        const clientId = process.env.SPOTIFY_CLIENT_ID?.trim() || "1bad4f22209e471b9c155495dd6f3f30";
+        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
         const origin = new URL(request.url).origin;
         const redirectUri = `${origin}/api/spotify/callback`;
 

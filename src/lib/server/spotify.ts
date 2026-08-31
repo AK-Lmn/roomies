@@ -20,7 +20,7 @@ export interface SpotifyStatus {
 }
 
 function getSpotifyClientId(): string {
-  return process.env.SPOTIFY_CLIENT_ID?.trim() || "";
+  return process.env.SPOTIFY_CLIENT_ID?.trim() || "1bad4f22209e471b9c155495dd6f3f30";
 }
 
 function getSpotifyClientSecret(): string {
@@ -59,7 +59,7 @@ function ensureSpotifySchema(sql: Sql): Promise<void> {
 export const getSpotifyStatus = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }): Promise<SpotifyStatus> => {
-    const isConfigured = Boolean(getSpotifyClientId() && getSpotifyClientSecret());
+    const isConfigured = Boolean(getSpotifyClientId());
     if (!isConfigured) return { isConfigured: false, isConnected: false };
 
     const sql = await getSql();
@@ -82,8 +82,7 @@ export const getSpotifyAuthUrl = createServerFn({ method: "GET" })
   .validator(z.object({ redirectUri: z.string().optional() }))
   .handler(async ({ context, data }): Promise<{ url: string | null; error?: string }> => {
     const clientId = getSpotifyClientId();
-    const clientSecret = getSpotifyClientSecret();
-    if (!clientId || !clientSecret) {
+    if (!clientId) {
       return { url: null, error: "SPOTIFY_NOT_CONFIGURED" };
     }
 
