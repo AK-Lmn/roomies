@@ -1,5 +1,5 @@
 import React from "react";
-import type { Animal } from "@/lib/identities";
+import { getAvatarChoiceByUrl } from "@/lib/avatar-choices";
 
 interface AnimalAvatarProps {
   animal?: string;
@@ -99,70 +99,21 @@ function AnimalIcon({ animal, size = 16 }: { animal?: string; size?: number }) {
           <path d="M12 10c-3-4-8-3-9 2s4 6 9 3c5 3 10 1 9-3s-6-6-9-2z" />
         </svg>
       );
-    case "crow":
-      return (
-        <svg {...strokeProps}>
-          <path d="M15 4l-4 3 4 3z" />
-          <path d="M11 7c-4 0-7 3-7 7 0 3 2 5 5 5h6c2 0 4-2 4-5 0-4-3-7-7-7z" />
-          <path d="M9 19l-2 3M14 19l2 3" />
-        </svg>
-      );
-    case "newt":
-      return (
-        <svg {...strokeProps}>
-          <path d="M12 3c-2 2-2 5 0 8s2 6 0 9" />
-          <path d="M8 8l-3-2M16 8l3-2M8 15l-3 2M16 15l3 2" />
-          <circle cx="12" cy="4" r="1.5" />
-        </svg>
-      );
-    case "badger":
-      return (
-        <svg {...strokeProps}>
-          <path d="M6 5l2 3M18 5l-2 3" />
-          <path d="M12 20c4.5 0 7-3 7-7 0-3-2-6-7-6s-7 3-7 6c0 4 2.5 7 7 7z" />
-          <path d="M10 7v10M14 7v10" />
-        </svg>
-      );
     case "sparrow":
-    case "wren":
+    case "bird":
       return (
         <svg {...strokeProps}>
-          <path d="M19 8l-4 2 4 2z" />
-          <path d="M15 10c-3-2-8-1-10 3 3 0 6 2 8 5h3c2 0 3-2 3-5 0-1.5-.5-2.5-1-3z" />
-          <path d="M10 18l-3 3" />
-        </svg>
-      );
-    case "toad":
-      return (
-        <svg {...strokeProps}>
-          <ellipse cx="12" cy="14" rx="8" ry="6" />
-          <circle cx="7" cy="8" r="2.5" />
-          <circle cx="17" cy="8" r="2.5" />
-          <path d="M8 15h8" />
-        </svg>
-      );
-    case "mink":
-      return (
-        <svg {...strokeProps}>
-          <path d="M7 6l2 2M17 6l-2 2" />
-          <path d="M12 21c3.5 0 6-3 6-8 0-4-2.5-6-6-6s-6 2-6 6c0 5 2.5 8 6 8z" />
-          <path d="M10 14h4" />
-        </svg>
-      );
-    case "seal":
-      return (
-        <svg {...strokeProps}>
-          <path d="M12 4a5 5 0 0 0-5 5c0 3 2 5 5 5s5-2 5-5a5 5 0 0 0-5-5z" />
-          <path d="M7 14c-3 1-4 4-4 6h18c0-2-1-5-4-6" />
-          <circle cx="10" cy="8" r=".5" fill="currentColor" />
-          <circle cx="14" cy="8" r=".5" fill="currentColor" />
+          <path d="M16 7l3 1-2 2" />
+          <path d="M4 15c4 0 7-3 8-7 4 2 8 2 9 0 0 6-4 10-10 10a9 9 0 0 1-7-3z" />
         </svg>
       );
     default:
       return (
         <svg {...strokeProps}>
-          <circle cx="12" cy="12" r="7" />
-          <path d="M12 8v8M8 12h8" />
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="9" cy="10" r="1" fill="currentColor" />
+          <circle cx="15" cy="10" r="1" fill="currentColor" />
+          <path d="M9.5 15a3.5 3.5 0 0 0 5 0" />
         </svg>
       );
   }
@@ -170,30 +121,36 @@ function AnimalIcon({ animal, size = 16 }: { animal?: string; size?: number }) {
 
 export function AnimalAvatar({
   animal,
-  color = "#c2905a",
-  size = 28,
-  revealed = false,
+  color,
+  size = 32,
+  revealed,
   displayName,
   profileImageUrl,
   online,
   className = "",
 }: AnimalAvatarProps) {
   const iconSize = Math.round(size * 0.55);
+  const avatarChoice = profileImageUrl ? getAvatarChoiceByUrl(profileImageUrl) : null;
+  const borderOrBgColor = avatarChoice?.color ?? color;
 
   return (
     <div className={`relative shrink-0 ${className}`} style={{ width: size, height: size }}>
       {revealed && profileImageUrl ? (
-        <img
-          src={profileImageUrl}
-          alt={displayName || "User"}
-          className="w-full h-full rounded-full object-contain p-0.5 border"
-          style={{ borderColor: "var(--color-border)", background: "var(--color-surface2)" }}
-        />
+        <div
+          className="w-full h-full rounded-full overflow-hidden border p-0.5 flex items-center justify-center shadow-xs"
+          style={{ borderColor: borderOrBgColor ?? "var(--color-border)", background: "var(--color-surface2)" }}
+        >
+          <img
+            src={profileImageUrl}
+            alt={displayName || "User"}
+            className="w-full h-full object-contain rounded-full"
+          />
+        </div>
       ) : revealed && displayName ? (
         <div
           className="w-full h-full rounded-full flex items-center justify-center font-bold text-xs shadow-xs"
           style={{
-            background: color,
+            background: borderOrBgColor ?? "var(--color-primary)",
             color: "#ffffff",
           }}
         >

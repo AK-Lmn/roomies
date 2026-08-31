@@ -293,6 +293,7 @@ function RoomPage() {
                 size={18}
                 revealed={me.revealed}
                 displayName={me.profile?.displayName}
+                profileImageUrl={me.profile?.avatarUrl}
               />
               <span className="text-[11px] sm:text-xs font-medium max-w-[55px] sm:max-w-[110px] truncate" style={{ color: "var(--color-fg)" }}>
                 {me.revealed && me.profile?.displayName ? me.profile.displayName : me.tempIdentity}
@@ -376,6 +377,7 @@ function RoomPage() {
               size={18}
               revealed={m.revealed}
               displayName={m.profile?.displayName}
+              profileImageUrl={m.profile?.avatarUrl}
               online={m.online}
             />
             <span className="text-xs truncate max-w-[90px]" style={{ color: "var(--color-fg)" }}>
@@ -593,6 +595,7 @@ function ChatTab({
                   size={30}
                   revealed={member?.revealed ?? Boolean(msg.revealedName)}
                   displayName={msg.revealedName}
+                  profileImageUrl={member?.profile?.avatarUrl}
                   className="mt-0.5"
                 />
                 <div className={`max-w-[85%] sm:max-w-[75%] space-y-1 ${msg.isMe ? "items-end" : "items-start"} flex flex-col`}>
