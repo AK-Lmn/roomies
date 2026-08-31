@@ -115,7 +115,7 @@ function MatchPage() {
                   <Clock size={12} />
                   <span>7-Day Cycle</span>
                 </div>
-                <p className="opacity-70 text-[11px] leading-tight">Ephemeral memories, daily prompts</p>
+                <p className="opacity-70 text-[11px] leading-tight">Shared music, daily prompts</p>
               </div>
             </div>
 

@@ -1,7 +1,7 @@
 {
   "name": "Roomies",
   "short_name": "Roomies",
-  "description": "7-day ephemeral shared rooms for anonymous strangers. Chat, share music, and stick fridge notes.",
+  "description": "Share a cozy room with strangers for 7 days. Chat, play music, and leave notes.",
   "start_url": "/",
   "id": "/",
   "display": "standalone",

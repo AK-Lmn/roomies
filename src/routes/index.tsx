@@ -108,7 +108,7 @@ function HomePage() {
                 7 days.
               </h1>
               <p className="text-sm sm:text-base max-w-md mx-auto leading-relaxed" style={{ color: "var(--color-muted)" }}>
-                Get matched into an ephemeral room with 1–8 people. Chat, share music, stick fridge notes. Choose when to reveal who you are.
+                Share a cozy room with strangers for 7 days. Chat, play music, and leave notes.
               </p>
             </div>
 
