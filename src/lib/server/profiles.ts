@@ -135,3 +135,25 @@ export const upsertProfile = createServerFn({ method: "POST" })
     `;
     return { ok: true };
   });
+
+// ─── check availability ───────────────────────────────────────────────────
+
+export const checkUsernameAvailability = createServerFn({ method: "POST" })
+  .validator(z.object({ username: z.string(), currentUserId: z.string().optional() }))
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const norm = normalizeUsername(data.username);
+    if (!USERNAME_RE.test(norm)) {
+      return { available: false, reason: "invalid_format", username: norm };
+    }
+    const rows = await sql<{ user_id: string }>`
+      select user_id from profiles where lower(username) = ${norm}
+    `;
+    if (rows.length === 0) {
+      return { available: true, username: norm };
+    }
+    if (data.currentUserId && rows[0].user_id === data.currentUserId) {
+      return { available: true, username: norm };
+    }
+    return { available: false, reason: "taken", username: norm };
+  });

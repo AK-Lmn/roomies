@@ -186,8 +186,8 @@ export function AnimalAvatar({
         <img
           src={profileImageUrl}
           alt={displayName || "User"}
-          className="w-full h-full rounded-full object-cover border"
-          style={{ borderColor: "var(--color-border)" }}
+          className="w-full h-full rounded-full object-contain p-0.5 border"
+          style={{ borderColor: "var(--color-border)", background: "var(--color-surface2)" }}
         />
       ) : revealed && displayName ? (
         <div

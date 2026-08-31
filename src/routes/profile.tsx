@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { getMyProfile, upsertProfile } from "@/lib/server/profiles";
+import { getMyProfile, upsertProfile, checkUsernameAvailability } from "@/lib/server/profiles";
 import { useEffect, useState, type FormEvent } from "react";
 import { LIMITS, USERNAME_RE, normalizeUsername } from "@/lib/limits";
+import { ANIMAL_AVATAR_CHOICES, getAvatarChoiceByUrl, type AnimalAvatarChoice } from "@/lib/avatar-choices";
+import { generateRandomUsername } from "@/lib/username-generator";
 import type { Profile } from "@/lib/types";
 import { UserButton } from "@/lib/auth/gates";
-import { ArrowLeft, Check, Shield, Globe, Instagram, Twitter, User } from "lucide-react";
+import { ArrowLeft, Check, X, Shield, Globe, Instagram, Twitter, User, Shuffle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -14,6 +16,7 @@ function ProfilePage() {
   const { user, isPending } = useCurrentUserState();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
+  const [selectedAvatar, setSelectedAvatar] = useState<AnimalAvatarChoice>(ANIMAL_AVATAR_CHOICES[0]);
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -26,8 +29,16 @@ function ProfilePage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"available" | "taken" | "invalid" | null>(null);
 
   const userId = user?.id;
+
+  function handleRegenerateUsername() {
+    const randomUser = generateRandomUsername();
+    setUsername(randomUser);
+  }
+
   useEffect(() => {
     if (!userId) {
       setProfile(null);
@@ -39,6 +50,7 @@ function ProfilePage() {
       setUsername(p.username);
       setDisplayName(p.displayName);
       setBio(p.bio);
+      setSelectedAvatar(getAvatarChoiceByUrl(p.avatarUrl));
       setWebsiteUrl(p.social.website);
       setInstagramUrl(p.social.instagram);
       setXUrl(p.social.x);
@@ -47,6 +59,32 @@ function ProfilePage() {
       setShowJoined(p.showJoined);
     }).catch(() => setProfile(null));
   }, [userId, navigate]);
+
+  // Live availability check debounce
+  useEffect(() => {
+    if (!username) {
+      setUsernameStatus(null);
+      return;
+    }
+    const norm = normalizeUsername(username);
+    if (!USERNAME_RE.test(norm)) {
+      setUsernameStatus("invalid");
+      return;
+    }
+    setCheckingUsername(true);
+    const timer = setTimeout(() => {
+      checkUsernameAvailability({ data: { username: norm, currentUserId: userId } })
+        .then((res) => {
+          setUsernameStatus(res.available ? "available" : "taken");
+        })
+        .catch(() => {
+          setUsernameStatus(null);
+        })
+        .finally(() => setCheckingUsername(false));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [username, userId]);
 
   if (isPending || profile === "loading") return <div className="grid min-h-dvh place-items-center"><span className="text-sm" style={{ color: "var(--color-muted)" }}>Loading…</span></div>;
   if (!user) return <RedirectToSignIn />;
@@ -60,13 +98,30 @@ function ProfilePage() {
       setError("Username: 3–20 lowercase letters, numbers, underscores only.");
       return;
     }
+    if (usernameStatus === "taken") {
+      setError("That username is already taken. Please choose another.");
+      return;
+    }
     if (displayName.trim().length < LIMITS.displayNameMin) {
       setError(`Display name must be at least ${LIMITS.displayNameMin} characters.`);
       return;
     }
     setSaving(true);
     try {
-      await upsertProfile({ data: { username: norm, displayName: displayName.trim(), bio: bio.trim(), avatarUrl: null, websiteUrl: websiteUrl.trim(), instagramUrl: instagramUrl.trim(), xUrl: xUrl.trim(), showBio, showSocial, showJoined } });
+      await upsertProfile({
+        data: {
+          username: norm,
+          displayName: displayName.trim(),
+          bio: bio.trim(),
+          avatarUrl: selectedAvatar.avatarUrl,
+          websiteUrl: websiteUrl.trim(),
+          instagramUrl: instagramUrl.trim(),
+          xUrl: xUrl.trim(),
+          showBio,
+          showSocial,
+          showJoined,
+        },
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err: unknown) {
@@ -88,25 +143,137 @@ function ProfilePage() {
       </header>
 
       <main className="max-w-sm mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center gap-2">
-          <User size={20} className="text-amber-400" />
-          <h1 className="text-xl font-semibold" style={{ color: "var(--color-fg)" }}>Your profile</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl overflow-hidden border p-0.5 shadow-md shrink-0" style={{ borderColor: selectedAvatar.color, background: "var(--color-surface)" }}>
+            <img src={selectedAvatar.avatarUrl} alt={selectedAvatar.name} className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold" style={{ color: "var(--color-fg)" }}>Your profile</h1>
+            <p className="text-xs opacity-70" style={{ color: "var(--color-muted)" }}>Customize your avatar and roommate identity</p>
+          </div>
         </div>
 
         <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
-          {[
-            { label: "Username", value: username, set: setUsername, max: LIMITS.usernameMax, transform: (v: string) => v.toLowerCase() },
-            { label: "Display name", value: displayName, set: setDisplayName, max: LIMITS.displayNameMax },
-          ].map(({ label, value, set, max, transform }) => (
-            <div key={label} className="space-y-1">
-              <label className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>{label}</label>
-              <input type="text" value={value} onChange={(e) => set(transform ? transform(e.target.value) : e.target.value)} maxLength={max} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1" style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }} />
+          {/* Avatar Choices Grid */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider block" style={{ color: "var(--color-muted)" }}>
+              Animal Avatar
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {ANIMAL_AVATAR_CHOICES.map((choice) => {
+                const isSelected = selectedAvatar.id === choice.id;
+                return (
+                  <button
+                    key={choice.id}
+                    type="button"
+                    onClick={() => setSelectedAvatar(choice)}
+                    className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:scale-105 cursor-pointer relative"
+                    style={{
+                      background: isSelected ? "var(--color-surface2)" : "var(--color-surface)",
+                      borderColor: isSelected ? choice.color : "var(--color-border)",
+                      boxShadow: isSelected ? `0 0 0 1px ${choice.color}` : "none",
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center p-0.5" style={{ background: "var(--color-surface2)" }}>
+                      <img src={choice.avatarUrl} alt={choice.name} className="w-full h-full object-contain" />
+                    </div>
+                    <span className="text-[11px] font-medium truncate w-full text-center" style={{ color: isSelected ? "var(--color-fg)" : "var(--color-muted)" }}>
+                      {choice.name}
+                    </span>
+                    {isSelected && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ background: choice.color }}>
+                        <Check size={10} strokeWidth={3} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          ))}
+          </div>
+
+          {/* Username with regenerate button and availability check */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>Username</label>
+              {checkingUsername ? (
+                <span className="text-[11px] flex items-center gap-1 opacity-70" style={{ color: "var(--color-muted)" }}>
+                  <Loader2 size={11} className="animate-spin" /> Checking…
+                </span>
+              ) : usernameStatus === "available" ? (
+                <span className="text-[11px] flex items-center gap-1 text-emerald-400 font-medium">
+                  <Check size={12} strokeWidth={2.5} /> Available
+                </span>
+              ) : usernameStatus === "taken" ? (
+                <span className="text-[11px] flex items-center gap-1 text-rose-400 font-medium">
+                  <X size={12} strokeWidth={2.5} /> Already taken
+                </span>
+              ) : null}
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-2 text-xs text-neutral-500 font-mono">@</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  maxLength={LIMITS.usernameMax}
+                  required
+                  className="w-full rounded-lg pl-7 pr-3 py-2 text-sm outline-none focus:ring-1 border"
+                  style={{
+                    background: "var(--color-surface2)",
+                    color: "var(--color-fg)",
+                    borderColor: usernameStatus === "taken" ? "rgba(244, 63, 94, 0.4)" : "var(--color-border)",
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleRegenerateUsername}
+                title="Generate random username"
+                className="px-3 rounded-lg border flex items-center justify-center gap-1.5 text-xs font-medium hover:bg-neutral-800 cursor-pointer"
+                style={{
+                  background: "var(--color-surface2)",
+                  borderColor: "var(--color-border)",
+                  color: "var(--color-fg)",
+                }}
+              >
+                <Shuffle size={13} />
+                <span>Shuffle</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>Display name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={LIMITS.displayNameMax}
+              required
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 border"
+              style={{
+                background: "var(--color-surface2)",
+                color: "var(--color-fg)",
+                borderColor: "var(--color-border)",
+              }}
+            />
+          </div>
 
           <div className="space-y-1">
             <label className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>Bio</label>
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={LIMITS.bioMax} rows={3} className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none focus:ring-1" style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }} />
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              maxLength={LIMITS.bioMax}
+              rows={3}
+              className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 border"
+              style={{
+                background: "var(--color-surface2)",
+                color: "var(--color-fg)",
+                borderColor: "var(--color-border)",
+              }}
+            />
             <div className="text-xs text-right" style={{ color: "var(--color-muted)" }}>{bio.length}/{LIMITS.bioMax}</div>
           </div>
 
@@ -121,7 +288,19 @@ function ProfilePage() {
               { label: "X / Twitter handle", value: xUrl, set: setXUrl, Icon: Twitter },
             ].map(({ label, value, set }) => (
               <div key={label}>
-                <input type="text" value={value} onChange={(e) => set(e.target.value)} placeholder={label} maxLength={LIMITS.socialUrlMax} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1" style={{ background: "var(--color-surface2)", color: "var(--color-fg)", border: "1px solid var(--color-border)" }} />
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  placeholder={label}
+                  maxLength={LIMITS.socialUrlMax}
+                  className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 border"
+                  style={{
+                    background: "var(--color-surface2)",
+                    color: "var(--color-fg)",
+                    borderColor: "var(--color-border)",
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -150,7 +329,12 @@ function ProfilePage() {
             </p>
           )}
 
-          <button type="submit" disabled={saving} className="w-full rounded-lg py-2.5 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50" style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}>
+          <button
+            type="submit"
+            disabled={saving || checkingUsername || usernameStatus === "taken"}
+            className="w-full rounded-lg py-2.5 text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50 cursor-pointer"
+            style={{ background: "var(--color-primary)", color: "var(--color-primary-fg)" }}
+          >
             {saving ? "Saving…" : "Save profile"}
           </button>
         </form>
