@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/spotify/callback")({
         }
 
         const clientId = process.env.SPOTIFY_CLIENT_ID?.trim() || "1bad4f22209e471b9c155495dd6f3f30";
-        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
+        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim() || "6a00fe79e32046c28af37aa6b4229c1b";
         const origin = new URL(request.url).origin;
         const redirectUri = `${origin}/api/spotify/callback`;
 
@@ -35,21 +35,16 @@ export const Route = createFileRoute("/api/spotify/callback")({
             grant_type: "authorization_code",
             code,
             redirect_uri: redirectUri,
-            client_id: clientId,
           });
 
-          const headers: Record<string, string> = {
-            "Content-Type": "application/x-www-form-urlencoded",
-          };
-
-          if (clientSecret) {
-            bodyParams.append("client_secret", clientSecret);
-            headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-          }
+          const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
           const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
             method: "POST",
-            headers,
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Authorization": `Basic ${basicAuth}`,
+            },
             body: bodyParams,
           });
 

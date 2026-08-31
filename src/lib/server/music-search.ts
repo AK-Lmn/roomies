@@ -16,6 +16,7 @@ export interface TrackMetadata {
   title: string;
   artist: string;
   coverUrl: string | null;
+  previewUrl?: string | null;
 }
 
 /**
@@ -45,7 +46,6 @@ export const searchTracks = createServerFn({ method: "GET" })
       if (!json.results) return [];
 
       return json.results.map((item) => {
-        // Upgrade 100x100 artwork to higher resolution 600x600 if available
         const cover = item.artworkUrl100 ? item.artworkUrl100.replace("100x100bb", "600x600bb") : null;
         const searchYoutubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
           `${item.artistName} - ${item.trackName}`,
@@ -67,8 +67,28 @@ export const searchTracks = createServerFn({ method: "GET" })
     }
   });
 
+async function resolveAudioPreview(title: string, artist: string): Promise<{ previewUrl: string | null; coverUrl: string | null }> {
+  try {
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&entity=song&limit=1`;
+    const res = await fetch(itunesUrl, { headers: { "User-Agent": "Roomies/1.0" } });
+    if (!res.ok) return { previewUrl: null, coverUrl: null };
+    const json = (await res.json()) as {
+      results?: Array<{
+        previewUrl?: string;
+        artworkUrl100?: string;
+      }>;
+    };
+    const result = json.results?.[0];
+    const previewUrl = result?.previewUrl || null;
+    const coverUrl = result?.artworkUrl100 ? result.artworkUrl100.replace("100x100bb", "600x600bb") : null;
+    return { previewUrl, coverUrl };
+  } catch {
+    return { previewUrl: null, coverUrl: null };
+  }
+}
+
 /**
- * Smart URL metadata resolver via official Spotify / YouTube oEmbed.
+ * Smart URL metadata resolver via official Spotify / YouTube oEmbed + 30s audio preview.
  */
 export const fetchTrackMetadata = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -87,7 +107,6 @@ export const fetchTrackMetadata = createServerFn({ method: "GET" })
             thumbnail_url?: string;
           };
           if (info.title) {
-            // Spotify oEmbed title is often "Track Title - song and lyrics by Artist" or just "Track Title"
             let title = info.title;
             let artist = "Spotify Artist";
 
@@ -105,10 +124,15 @@ export const fetchTrackMetadata = createServerFn({ method: "GET" })
               artist = parts[1] || artist;
             }
 
+            const cleanTitle = title.trim();
+            const cleanArtist = artist.trim();
+            const audioData = await resolveAudioPreview(cleanTitle, cleanArtist);
+
             return {
-              title: title.trim(),
-              artist: artist.trim(),
-              coverUrl: info.thumbnail_url || null,
+              title: cleanTitle,
+              artist: cleanArtist,
+              coverUrl: info.thumbnail_url || audioData.coverUrl,
+              previewUrl: audioData.previewUrl,
             };
           }
         }
@@ -125,10 +149,15 @@ export const fetchTrackMetadata = createServerFn({ method: "GET" })
             thumbnail_url?: string;
           };
           if (info.title) {
+            const cleanTitle = info.title.trim();
+            const cleanArtist = (info.author_name || "YouTube Creator").trim();
+            const audioData = await resolveAudioPreview(cleanTitle, cleanArtist);
+
             return {
-              title: info.title,
-              artist: info.author_name || "YouTube Creator",
-              coverUrl: info.thumbnail_url || null,
+              title: cleanTitle,
+              artist: cleanArtist,
+              coverUrl: info.thumbnail_url || audioData.coverUrl,
+              previewUrl: audioData.previewUrl,
             };
           }
         }

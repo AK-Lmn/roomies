@@ -1251,6 +1251,7 @@ function MusicTab({ roomId }: { roomId: string }) {
   const [pastedTitle, setPastedTitle] = useState("");
   const [pastedArtist, setPastedArtist] = useState("");
   const [pastedCover, setPastedCover] = useState<string | null>(null);
+  const [pastedPreviewUrl, setPastedPreviewUrl] = useState<string | null>(null);
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [isAddingPasted, setIsAddingPasted] = useState(false);
 
@@ -1317,6 +1318,7 @@ function MusicTab({ roomId }: { roomId: string }) {
           setPastedTitle(meta.title);
           setPastedArtist(meta.artist);
           setPastedCover(meta.coverUrl);
+          setPastedPreviewUrl(meta.previewUrl ?? null);
         }
       } finally {
         setIsFetchingMeta(false);
@@ -1359,12 +1361,14 @@ function MusicTab({ roomId }: { roomId: string }) {
           artist: pastedArtist.trim() || "Artist",
           url: pasteUrl.trim(),
           coverUrl: pastedCover,
+          previewUrl: pastedPreviewUrl,
         },
       });
       setPasteUrl("");
       setPastedTitle("");
       setPastedArtist("");
       setPastedCover(null);
+      setPastedPreviewUrl(null);
       await loadSongs();
     } finally {
       setIsAddingPasted(false);
@@ -1383,6 +1387,7 @@ function MusicTab({ roomId }: { roomId: string }) {
           artist: nowPlaying.artist,
           url: nowPlaying.url,
           coverUrl: nowPlaying.coverUrl,
+          previewUrl: nowPlaying.previewUrl,
         },
       });
       await loadSongs();
@@ -1430,13 +1435,25 @@ function MusicTab({ roomId }: { roomId: string }) {
               }}
             >
               <div className="flex items-center gap-3 min-w-0">
-                {nowPlaying.coverUrl ? (
-                  <img src={nowPlaying.coverUrl} alt="" className="h-11 w-11 rounded-xl object-cover shrink-0" />
-                ) : (
-                  <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-emerald-950 text-emerald-400 shrink-0">
-                    <Disc3 size={22} />
-                  </div>
-                )}
+                <div className="relative group/nowplaying h-11 w-11 rounded-xl overflow-hidden shrink-0">
+                  {nowPlaying.coverUrl ? (
+                    <img src={nowPlaying.coverUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center bg-emerald-950 text-emerald-400">
+                      <Disc3 size={22} />
+                    </div>
+                  )}
+                  {nowPlaying.previewUrl && (
+                    <button
+                      type="button"
+                      onClick={() => togglePreview(nowPlaying.previewUrl ?? null)}
+                      className="absolute inset-0 bg-black/60 opacity-0 group-hover/nowplaying:opacity-100 flex items-center justify-center text-white transition-opacity cursor-pointer"
+                      title={playingPreviewUrl === nowPlaying.previewUrl ? "Pause Preview" : "Play 30s Preview"}
+                    >
+                      {playingPreviewUrl === nowPlaying.previewUrl ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" />}
+                    </button>
+                  )}
+                </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />

@@ -8,6 +8,7 @@ export interface SpotifyTrackInfo {
   artist: string;
   album: string;
   coverUrl: string | null;
+  previewUrl?: string | null;
   url: string;
   durationMs: number;
   progressMs: number;
@@ -24,7 +25,7 @@ function getSpotifyClientId(): string {
 }
 
 function getSpotifyClientSecret(): string {
-  return process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
+  return process.env.SPOTIFY_CLIENT_SECRET?.trim() || "6a00fe79e32046c28af37aa6b4229c1b";
 }
 
 const SPOTIFY_SCOPES = [
@@ -127,19 +128,15 @@ async function getValidToken(sql: Sql, userId: string): Promise<string | null> {
     const bodyParams = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: row.refresh_token,
-      client_id: clientId,
     });
-    const headers: Record<string, string> = {
-      "Content-Type": "application/x-www-form-urlencoded",
-    };
-    if (clientSecret) {
-      bodyParams.append("client_secret", clientSecret);
-      headers["Authorization"] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-    }
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
     const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${basicAuth}`,
+      },
       body: bodyParams,
     });
 
@@ -223,11 +220,25 @@ export const getSpotifyNowPlaying = createServerFn({ method: "GET" })
 
       if (!data.item) return null;
 
+      const title = data.item.name;
+      const artist = data.item.artists.map((a) => a.name).join(", ");
+      let previewUrl: string | null = null;
+
+      try {
+        const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&entity=song&limit=1`;
+        const itunesRes = await fetch(itunesUrl, { headers: { "User-Agent": "Roomies/1.0" } });
+        if (itunesRes.ok) {
+          const itunesJson = (await itunesRes.json()) as { results?: Array<{ previewUrl?: string }> };
+          previewUrl = itunesJson.results?.[0]?.previewUrl || null;
+        }
+      } catch {}
+
       return {
-        title: data.item.name,
-        artist: data.item.artists.map((a) => a.name).join(", "),
+        title,
+        artist,
         album: data.item.album?.name || "",
         coverUrl: data.item.album?.images[0]?.url || null,
+        previewUrl,
         url: data.item.external_urls?.spotify || "",
         durationMs: data.item.duration_ms,
         progressMs: data.progress_ms,
